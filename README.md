@@ -2,21 +2,23 @@
 
 Qt based Studio SW application for use with CARLA 
 Currently provides features like setup from src or from binaries, vehicle import, sensor calibration, and simulation control with health check.
-Uses interfaces like libCARLA and PythonAPI to allow further standard interfacing.
+Uses interfaces like libCARLA and PythonAPI to allow further standard interfacing when built with a carla installation.(see below)
 
-## Quick build
+## Build 
 
 ```bash
-make integrate CARLA_DIR=/path/to/carla
-cd /path/to/carla/Build
-cmake .. -DBUILD_CARLA_STUDIO=ON -DCMAKE_BUILD_TYPE=Release
-make all CARLA_DIR=/path/to/carla
+make all
 ```
+Binary: `app/carla-studio`. Point the app to your CARLA installation at runtime via `CARLA_ROOT` and it resolves paths automatically.
 
-Binaries land in `Build/Apps/CarlaStudio/`.
+### Build with CARLA source code (ue5-dev / ue4-dev) branches
+
+```bash
+make all CARLA_DIR=/path/to/carla/source
+```
 
 ## Docs
 
-- [BUILD.md](BUILD.md) — prerequisites, build options, troubleshooting
-- [USAGE.md](USAGE.md) — CLI and GUI usage reference
-- [DEVELOP.md](DEVELOP.md) — code structure and contribution notes
+- [BUILD.md](BUILD.md) - prerequisites, build options, troubleshooting
+- [USAGE.md](USAGE.md) - CLI and GUI usage reference
+- [DEVELOP.md](DEVELOP.md) - code structure and contribution notes

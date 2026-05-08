@@ -1,9 +1,9 @@
 SPDX-License-Identifier: AGPL-3.0-or-later
 
 Author:     Abdul, Hashim
-Maintainer: Open — community-driven; anyone willing to contribute is
+Maintainer: Open - community-driven; anyone willing to contribute is
             invited to step in (see CONTRIBUTING.md at the project root).
-Reviewer:   Per-PR — by convention, the contributor with the most lines
+Reviewer:   Per-PR - by convention, the contributor with the most lines
             contributed in the file modified by a PR acts as the default
             reviewer (see CONTRIBUTING.md). The convention shifts review
             load to whoever already has the most context.
