@@ -1,47 +1,22 @@
-# CarlaStudio Application Layer
+# CARLA Studio
 
-`Apps/CarlaStudio` is the top-layer CARLA Studio application module.
+Qt based Studio SW application for use with CARLA 
+Currently provides features like setup from src or from binaries, vehicle import, sensor calibration, and simulation control with health check.
+Uses interfaces like libCARLA and PythonAPI to allow further standard interfacing.
 
-It is intentionally separate from `Examples/QtClient`:
+## Quick build
 
-- `Examples/QtClient`: sample/reference Qt client workflows
-- `Apps/CarlaStudio`: full application-layer packaging and orchestration module
+```bash
+make integrate CARLA_DIR=/path/to/carla
+cd /path/to/carla/Build
+cmake .. -DBUILD_CARLA_STUDIO=ON -DCMAKE_BUILD_TYPE=Release
+make all CARLA_DIR=/path/to/carla
+```
 
-The legacy CarlaStudio surface is now the primary `carla-studio` target.
-The first-run and dashboard pages have been merged into that same application, so there is no separate shell target anymore.
+Binaries land in `Build/Apps/CarlaStudio/`.
 
-Current application surface includes:
+## Docs
 
-- The primary legacy CarlaStudio main application
-- First-run setup and dashboard pages built directly into the main application
-- A broader Qt feature surface that preserves the legacy simulation tooling workflow
-
-For a full LibCarla-backed build, configure from the workspace root with `BUILD_CARLA_CLIENT=ON` and `BUILD_CARLA_STUDIO=ON` so the `carla-client` target is available to the app.
-
-App-layer structure:
-
-- `src/core`: app context and runtime mode
-- `src/legacy`: primary CarlaStudio UI entry point (shipped `carla-studio` target)
-- `resources`: per-platform branding assets (icons, desktop entries, resource scripts)
-
-## UI surface
-
-The CarlaStudio shell is organized around the following areas:
-
-- Connection and launch controls
-- Sensor preview and configuration
-- World and actor inspection
-- Replay and recording workflow
-- Keyboard and joystick control surfaces
-- Debug visualization controls
-- Scenario and builder tools
-- Settings and persisted remote/SSH configuration
-
-## Design direction
-
-The first-run and dashboard pages should stay visually consistent with the earlier CarlaStudio style:
-
-- compact launch-first layout
-- clear status and connectivity indicators
-- tabbed workspace separation for advanced tools
-- light-default controls with strong hierarchy and readable spacing
+- [BUILD.md](BUILD.md) — prerequisites, build options, troubleshooting
+- [USAGE.md](USAGE.md) — CLI and GUI usage reference
+- [DEVELOP.md](DEVELOP.md) — code structure and contribution notes

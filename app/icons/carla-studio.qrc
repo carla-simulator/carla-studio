@@ -1,0 +1,40 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+  <qresource prefix="/icons">
+    <file alias="carla-studio-1024.png">linux/hicolor/1024x1024/apps/carla-studio.png</file>
+    <file alias="carla-studio.svg">linux/hicolor/scalable/apps/carla-studio.svg</file>
+  </qresource>
+  <qresource prefix="/plugins">
+    <file alias="CarlaTools/VehicleImporter.h">../vehicle/import/VehicleImporter.h</file>
+    <file alias="CarlaTools/VehicleImporter.cpp">../vehicle/import/VehicleImporter.cpp</file>
+    <file alias="CarlaTools/CarlaTools.cpp">../vehicle/import/CarlaTools.cpp</file>
+  </qresource>
+  <qresource prefix="/meta">
+    <file alias="CHANGELOG.md">../../docs/CHANGELOG.md</file>
+    <file alias="LICENSE">../../LICENSE</file>
+    <file alias="THIRD_PARTY.md">../../docs/THIRD_PARTY.md</file>
+    <file alias="CITATION.cff">../../CITATION.cff</file>
+    <file alias="CONTRIBUTING.md">../../docs/CONTRIBUTING.md</file>
+  </qresource>
+  <qresource prefix="/integrations">
+    <file alias="scripts/start.sh">../core/start.sh</file>
+    <file alias="scripts/stop.sh">../core/stop.sh</file>
+    <file alias="scripts/wait_functions.sh">../utils/wait_functions.sh</file>
+    <file alias="scripts/setup/advanced_build_autoware.sh">../utils/advanced_build_autoware.sh</file>
+    <file alias="scripts/setup/build_autoware.sh">../utils/build_autoware.sh</file>
+    <file alias="scripts/setup/carla_launcher.sh">../utils/carla_launcher.sh</file>
+    <file alias="scripts/setup/check_dependency_status.sh">../utils/check_dependency_status.sh</file>
+    <file alias="scripts/setup/keep_alive.sh">../utils/keep_alive.sh</file>
+    <file alias="scripts/setup/manage_sleep.sh">../utils/manage_sleep.sh</file>
+    <file alias="scripts/setup/quick_autoware_setup.sh">../utils/quick_autoware_setup.sh</file>
+    <file alias="scripts/setup/setup_autoware.sh">../utils/setup_autoware.sh</file>
+    <file alias="scripts/setup/test_terminal5_fix.sh">../utils/test_terminal5_fix.sh</file>
+    <file alias="scripts/setup/validate_10_terminals.sh">../utils/validate_10_terminals.sh</file>
+    <file alias="scripts/setup/validate_implementations.sh">../utils/validate_implementations.sh</file>
+    <file alias="run/terminal5_cosim_runner.sh">../integrations/scripts/terminal5_cosim_runner.sh</file>
+    <file alias="run/terminal8_preview_runner.sh">../integrations/scripts/terminal8_preview_runner.sh</file>
+    <file alias="run/terminal9_scenario_runner.sh">../integrations/scripts/terminal9_scenario_runner.sh</file>
+    <file alias="launch/terminal_launch_map.json">../utils/launch/terminal_launch_map.json</file>
+    <file alias="rviz/carla_mcity_ros2.rviz">../cfg/rviz/carla_mcity_ros2.rviz</file>
+  </qresource>
+</RCC>

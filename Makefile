@@ -1,71 +1,108 @@
-.PHONY: help clean integrate
+.PHONY: help clean integrate gui suite all
+
+JOBS ?= $(shell nproc 2>/dev/null || echo 4)
 
 help:
 	@echo "CARLA Studio Build"
 	@echo ""
-	@echo "Usage:"
-	@echo "  make CARLA_DIR=<path>            - Standalone build with LibCarla"
-	@echo "  make integrate CARLA_DIR=<path>  - Symlink & integrate with main CARLA repo"
-	@echo "  make clean                       - Clean build artifacts"
+	@echo "Standalone (builds against LibCarla):"
+	@echo "  make CARLA_DIR=<path>              - Build GUI + CLI + tests"
+	@echo ""
+	@echo "Integrated (after 'make integrate'):"
+	@echo "  make gui   CARLA_DIR=<path>        - carla-studio (GUI + vehicle-import CLI)"
+	@echo "  make suite CARLA_DIR=<path>        - run full test suite (+ --update-documentation)"
+	@echo "  make all   CARLA_DIR=<path>        - build all targets"
+	@echo ""
+	@echo "Other:"
+	@echo "  make integrate CARLA_DIR=<path>    - Symlink repo into CARLA workspace"
+	@echo "  make clean                         - Remove local build/ directory"
+	@echo ""
+	@echo "Options:"
+	@echo "  JOBS=N   parallel jobs (default: nproc)"
 	@echo ""
 
-# Validate CARLA_DIR is provided
+# ---------------------------------------------------------------------------
+# Validation helpers
+# ---------------------------------------------------------------------------
+
 check-carla-dir:
 	@if [ -z "$(CARLA_DIR)" ]; then \
 		echo "Error: CARLA_DIR must be specified"; \
-		echo "Usage: make CARLA_DIR=/path/to/carla"; \
+		echo "Usage: make <target> CARLA_DIR=/path/to/carla"; \
 		exit 1; \
 	fi
 	@if [ ! -f "$(CARLA_DIR)/CMakeLists.txt" ]; then \
 		echo "Error: $(CARLA_DIR) is not a valid CARLA source directory"; \
-		echo "Expected CMakeLists.txt not found"; \
 		exit 1; \
 	fi
-	@echo "[✓] CARLA_DIR validated: $(CARLA_DIR)"
 
-# Default target (if make is called without CARLA_DIR)
+check-build-dir: check-carla-dir
+	@if [ ! -f "$(CARLA_DIR)/Build/CMakeCache.txt" ]; then \
+		echo "Error: $(CARLA_DIR)/Build not configured yet."; \
+		echo "Run: cd $(CARLA_DIR)/Build && cmake .. -DBUILD_CARLA_STUDIO=ON"; \
+		exit 1; \
+	fi
+
+# ---------------------------------------------------------------------------
+# Integrated build targets
+# ---------------------------------------------------------------------------
+
+gui: check-build-dir
+	cmake --build "$(CARLA_DIR)/Build" --target carla-studio -j$(JOBS)
+
+suite: check-build-dir
+	cmake --build "$(CARLA_DIR)/Build" --target test-suite_carla-studio-cli -j$(JOBS)
+	"$(CARLA_DIR)/Build/Apps/CarlaStudio/test-suite_carla-studio-cli" --update-documentation
+
+all: check-build-dir
+	cmake --build "$(CARLA_DIR)/Build" \
+	  --target carla-studio \
+	  --target test-suite_carla-studio-gui \
+	  --target test-suite_carla-studio-cli \
+	  -j$(JOBS)
+
+# ---------------------------------------------------------------------------
+# Standalone build (no prior integration needed)
+# ---------------------------------------------------------------------------
+
 .DEFAULT_GOAL := help
 
-# Standalone build: compile against external carla-client
 ifeq ($(MAKECMDGOALS),)
-else ifneq ($(filter-out help clean integrate check-carla-dir,$(MAKECMDGOALS)),)
-# User is calling make with CARLA_DIR for standalone build
+else ifneq ($(filter-out help clean integrate check-carla-dir check-build-dir gui suite all,$(MAKECMDGOALS)),)
 $(MAKECMDGOALS): check-carla-dir
 	@echo "[*] Building CARLA Studio standalone..."
 	@mkdir -p build
 	@cd build && \
-		cmake .. \
+		cmake ../app \
 		  -DCMAKE_BUILD_TYPE=Release \
 		  -DCMAKE_PREFIX_PATH="$(CARLA_DIR)/Build/install;/opt/carla" \
 		  -DBUILD_CARLA_CLIENT=ON \
 		  -DCARLA_STUDIO_FETCH_ASSIMP=ON && \
-		cmake --build . -j4
+		cmake --build . -j$(JOBS)
 	@echo ""
 	@echo "[+] Build complete!"
-	@echo "[+] Output: $$(pwd)/build/bin/carla-studio"
-	@echo "[+] Run with: ./build/bin/carla-studio"
+	@echo "[+] Binaries in $$(pwd)/build/Apps/CarlaStudio/"
 endif
 
-# Integrate mode: symlink into main repo
+# ---------------------------------------------------------------------------
+# Setup
+# ---------------------------------------------------------------------------
+
 integrate: check-carla-dir
 	@echo "[*] Setting up integration with CARLA..."
 	@if [ -L "$(CARLA_DIR)/Apps/CarlaStudio" ]; then \
-		echo "[!] Symlink already exists at $(CARLA_DIR)/Apps/CarlaStudio"; \
-		echo "[!] Removing..."; \
+		echo "[!] Removing existing symlink at $(CARLA_DIR)/Apps/CarlaStudio"; \
 		rm -f "$(CARLA_DIR)/Apps/CarlaStudio"; \
 	fi
-	@echo "[*] Creating symlink: $(CARLA_DIR)/Apps/CarlaStudio -> $$(pwd)"
 	@ln -s "$$(pwd)" "$(CARLA_DIR)/Apps/CarlaStudio"
-	@echo "[+] Integration complete!"
+	@echo "[+] Symlink: $(CARLA_DIR)/Apps/CarlaStudio -> $$(pwd)"
 	@echo ""
 	@echo "[*] Next steps:"
-	@echo "    cd $(CARLA_DIR)"
-	@echo "    mkdir -p Build && cd Build"
+	@echo "    cd $(CARLA_DIR)/Build"
 	@echo "    cmake .. -DBUILD_CARLA_STUDIO=ON -DCMAKE_BUILD_TYPE=Release"
-	@echo "    cmake --build . --target carla-studio -j4"
+	@echo "    make all CARLA_DIR=$(CARLA_DIR)"
 	@echo ""
 
-# Clean build artifacts
 clean:
 	@echo "[*] Cleaning build artifacts..."
 	@rm -rf build
