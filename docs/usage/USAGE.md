@@ -1,4 +1,4 @@
-# CARLA Studio — Usage Guide
+# CARLA Studio - Usage Guide
 
 CARLA Studio is a do it all user facing GUI for the CARLA simulator primarily to help new users and also the pro users in the iterative process of debugging some known/common issues.
 Every action performed through the GUI would normally require separate terminal commands, Python scripts, libCARLA interfacing and re-compilation and/or manual config edits is made accessible from one app (as much as possible and is still in-works.).
@@ -30,17 +30,16 @@ export CARLA_SHIPPING_ROOT=<user_preferred_path_prefix>/Carla-0.10.0-Linux-Shipp
 ### 2. Launch the GUI
 
 ```bash
-./app/carla-studio-<linux/mac/win>-<arch>
+./app/carla-studio-<platform:linux/mac/win>-<arch>
 ```
 
-The window opens showing the **Home** tab. CARLA does not start automatically —
+The window opens showing the **Home** tab. CARLA does not start automatically -
 click **START** when you are ready.
 
 ### 3. First-time setup wizard
 
 If this is your first run, click **Cfg → Install / Update CARLA** and follow the
-wizard to point Studio at your CARLA installation. You can also run it from
-the CLI:
+wizard to point Studio at your CARLA installation (basically the env $CARLA_ROOT). You can also run it from the CLI if needed:
 
 ```bash
 carla-studio setup
@@ -52,7 +51,7 @@ carla-studio setup
 
 All functionality lives on eight tabs. The **screenshot tool** (camera icon,
 top-right corner of the strip) waits 3 seconds then captures the entire
-desktop to a PNG and your clipboard — useful for capturing open menus before
+desktop to a PNG and your clipboard - useful for capturing open menus before
 they close.
 
 ---
@@ -68,7 +67,7 @@ The day-to-day launcher. Configure your session here before clicking START.
 | **Host** | Where CARLA runs: Local · Docker · Remote (SSH) · NVIDIA Brev |
 | **Weather** | Human-readable preset ("Clear · Noon", "Soft Rain · Night", etc.) |
 | **Port** | RPC port and endpoint address (default `localhost:2000`) |
-| **START / STOP** | START launches the full configured pipeline. STOP is the kill switch for every managed process — CARLA, UE editor, and the shipping client. |
+| **START / STOP** | START launches the full configured pipeline. STOP is the kill switch for every managed process - CARLA, UE editor, and the shipping client. |
 | **Process Control** | Live per-PID rows showing CPU / Memory / GPU. Bars go blue → yellow → red as load crosses 75 % → 95 %. |
 
 The status row at the top shows `CARLA x.y.z with Unreal N` when connected,
@@ -85,7 +84,7 @@ badge when the SDK and simulator versions differ.
 
 Controls *what the ego vehicle senses* and *who drives it*.
 
-The tab is split into two columns that gate progressively — you must configure
+The tab is split into two columns that gate progressively - you must configure
 **EGO** before any POV or V2X slot becomes interactive.
 
 #### Sense column
@@ -132,7 +131,7 @@ and shows exactly what is wrong.
 | Leaderboard | Module importable |
 | Autoware | Workspace found and `setup.bash` sourceable |
 | Plugins | Studio plugin directory scan |
-| **SDK ↔ Sim version** | Compares the linked `libcarla-client` build tag against the running simulator's reported version. A mismatch here means a crash is likely — fix it before clicking START. |
+| **SDK ↔ Sim version** | Compares the linked `libcarla-client` build tag against the running simulator's reported version. A mismatch here means a crash is likely - fix it before clicking START. |
 
 Footer buttons: **[Cleanup]** kills stale CARLA/UE processes. **[Re-check]**
 reruns all probes. The legend is `●OK · ●optional/not found · ●blocks launch`.
@@ -162,7 +161,7 @@ NVIDIA-powered scene reconstruction pipeline, broken into four tiles:
 **NuRec** renderer · **Asset-Harvester** · **NCore** · **Lyra 2.0**.
 
 Each tile is gated by your local hardware. If a tile is greyed out,
-hover over it — the tooltip names exactly which Health Check probe is
+hover over it - the tooltip names exactly which Health Check probe is
 failing (VRAM, CUDA version, NVIDIA driver). Resolve that probe and the
 tile unlocks.
 
@@ -340,7 +339,7 @@ The same pipeline available in the GUI is also accessible headlessly.
 ### Vehicle import
 
 ```bash
-# Minimal — mesh only
+# Minimal - mesh only
 carla-studio vehicle-import --mesh /path/to/car.obj
 
 # With a separate tires mesh
@@ -349,7 +348,7 @@ carla-studio vehicle-import --mesh car.obj --tires tires.obj
 # Cook, deploy, and open a drive session immediately after import
 carla-studio vehicle-import --mesh car.obj --manual-drive
 
-# Debug wheel anchor geometry only — no editor launch
+# Debug wheel anchor geometry only - no editor launch
 carla-studio vehicle-import --mesh car.obj --debug-merge-only
 ```
 
@@ -364,7 +363,7 @@ carla-studio setup      # re-run the first-time setup wizard
 ### Running tests
 
 ```bash
-# Unit and pipeline tests — no CARLA installation required
+# Unit and pipeline tests - no CARLA installation required
 ./app/carla-studio-<linux/mac/win>-<arch>/test-suite_carla-studio-cli
 
 # With vehicle fixture files
@@ -386,23 +385,23 @@ cleanly. You will see something like:
 CARLA Studio: std::terminate fired
   type:  std::bad_array_new_length
   what:  std::bad_array_new_length
-  hint:  LibCarla RPC version mismatch — rebuild libcarla-client
+  hint:  LibCarla RPC version mismatch - rebuild libcarla-client
          against the running simulator, or run Health Check →
          "SDK ↔ Sim version" to confirm compatibility.
 ```
 
 **What each field means:**
 
-- `type:` — the C++ exception class (demangled). Use this to search issues.
-- `what:` — the exception's own message.
-- `hint:` — the remediation step matched to that exception type.
+- `type:` - the C++ exception class (demangled). Use this to search issues.
+- `what:` - the exception's own message.
+- `hint:` - the remediation step matched to that exception type.
 
 **Common causes and fixes:**
 
 | `type:` value | Cause | Fix |
 |---|---|---|
 | `std::bad_array_new_length` | `libcarla-client` built against a different CARLA commit than the running sim | Rebuild the client or reinstall via **Cfg → Install / Update CARLA** |
-| `std::system_error` | Broken pipe — sim process died while Studio was connected | Restart the sim; check disk space and GPU memory |
+| `std::system_error` | Broken pipe - sim process died while Studio was connected | Restart the sim; check disk space and GPU memory |
 | `std::bad_alloc` | Out of memory in a client thread | Close other applications; reduce sensor count |
 
 The **Health Check** tab's **SDK ↔ Sim version** row detects the most common
