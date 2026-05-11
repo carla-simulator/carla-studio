@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Carla Studio
+GenericName=Carla Studio
+Comment=Driving simulation
+Exec=carla-studio %U
+Icon=carla-studio
+Terminal=false
+Categories=Utility;
+StartupNotify=true
+StartupWMClass=carla-studio

@@ -1,0 +1,39 @@
+{
+    "scenario": "matrix-test",
+    "sensor": "RGB",
+    "targets": [
+        {
+            "april_id": 0,
+            "cols": 8,
+            "rows": 6,
+            "size": 1.5,
+            "type": 0,
+            "x": -57,
+            "y": 24,
+            "yaw": 0,
+            "z": 1.5
+        },
+        {
+            "april_id": 0,
+            "cols": 8,
+            "rows": 6,
+            "size": 1.2,
+            "type": 1,
+            "x": -55,
+            "y": 22,
+            "yaw": 90,
+            "z": 0
+        },
+        {
+            "april_id": 0,
+            "cols": 8,
+            "rows": 6,
+            "size": 1.2,
+            "type": 3,
+            "x": -55,
+            "y": 25,
+            "yaw": 0,
+            "z": 0
+        }
+    ]
+}

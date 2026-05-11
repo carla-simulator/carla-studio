@@ -43,6 +43,7 @@
 build/
 Build/
 build-*/
+app/
 
 # CMake generated files
 CMakeFiles/
@@ -67,3 +68,10 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# Local test fixtures (3D vehicle assets, large binaries - not committed)
+tests/fixtures/vehicles/
+tests/outputs/
+
+# Vehicle import working directory
+.cs_import/
