@@ -127,9 +127,6 @@ void killProcess(qint64 pid)
   if (pid > 0) { (void)::system(QString("kill -9 %1 2>/dev/null").arg(pid).toLocal8Bit().constData()); }
 }
 
-
-
-
 std::atomic<qint64> g_editorPid{-1};
 std::atomic<qint64> g_carlaPid{-1};
 
@@ -203,13 +200,8 @@ cs::VehicleSpec makeSpec(const Fixture &f, const UserKnobs &k,
                          const QString &tires_path = QString())
 {
 
-
-
-
-
   cs::VehicleSpec s;
   cs::MeshGeometry g = cs::load_mesh_geometry(f.mesh_path);
-
 
   float scale_to_cm = 1.0f;
   if (g.valid) {
@@ -249,26 +241,15 @@ cs::VehicleSpec makeSpec(const Fixture &f, const UserKnobs &k,
     s.wheels[3].x = -140; s.wheels[3].y =  80; s.wheels[3].z = 35;
   }
 
-
-
-
-
-
-
-
-
-
   bool wheelsDegenerate =
       (s.wheels[0].x == 0 && s.wheels[1].x == 0 &&
        s.wheels[2].x == 0 && s.wheels[3].x == 0)
       || (!tires_path.isEmpty() && QFileInfo(tires_path).isFile());
 
-
   for (size_t i = 0; i < 4; ++i)
     if (s.wheels[i].radius * scale_to_cm > 0 && s.wheels[i].radius * scale_to_cm < 5.f)
       wheelsDegenerate = true;
   if (!wheelsDegenerate && g.valid) {
-
 
     float x_min = 1e30f, x_max = -1e30f, y_min = 1e30f, y_max = -1e30f;
     for (int i = 0; i < g.vertex_count(); ++i) {
@@ -310,8 +291,6 @@ cs::VehicleSpec makeSpec(const Fixture &f, const UserKnobs &k,
       if (z > z_max) z_max = z;
     }
 
-
-
     const float ext[3] = { x_max - x_min, y_max - y_min, z_max - z_min };
     auto longestAxis = [&]() {
       int a = 0;
@@ -331,9 +310,6 @@ cs::VehicleSpec makeSpec(const Fixture &f, const UserKnobs &k,
     const float latMaxV = (latAxisIdx == 0) ? x_max : (latAxisIdx == 1 ? y_max : z_max);
     const float upMinV  = (up_axis == 0) ? x_min : (up_axis == 1 ? y_min : z_min);
     const float fwdInset = (fwdMaxV - fwdMinV) * 0.21f;
-
-
-
 
     const float latExt   = latMaxV - latMinV;
     const float tire_half = std::max(tpl.width * 0.5f, 1.0f) /
@@ -431,15 +407,7 @@ QString workspaceRoot()
   return root;
 }
 
-
-
-
-
 void stageMaterialsBeside(const QString &objOnDisk, const QString &mtl);
-
-
-
-
 
 void autoStageBodyMaterials(const QString &body_obj, const QString &targetObj) {
   if (body_obj.isEmpty() || targetObj.isEmpty()) return;
@@ -460,8 +428,6 @@ void autoStageBodyMaterials(const QString &body_obj, const QString &targetObj) {
   }
   if (mtlName.isEmpty()) return;
 
-
-
   const QString sourceObj = QFileInfo(body_obj).canonicalFilePath();
   const QString sourceDir = sourceObj.isEmpty()
       ? QFileInfo(body_obj).absolutePath()
@@ -478,7 +444,6 @@ void stageMaterialsBeside(const QString &objOnDisk, const QString &mtl) {
   if (QFileInfo(objDir).canonicalFilePath()
       == QFileInfo(mtlDir).canonicalFilePath()) return;
 
-
   const QString objBase = QFileInfo(objOnDisk).fileName();
   for (const QFileInfo &fi : QDir(mtlDir).entryInfoList(
            QDir::Files | QDir::NoSymLinks | QDir::NoDotAndDotDot)) {
@@ -488,10 +453,6 @@ void stageMaterialsBeside(const QString &objOnDisk, const QString &mtl) {
     QFile::copy(fi.absoluteFilePath(), dst);
   }
 }
-
-
-
-
 
 QString centerObjOnDisk(const QString &srcPath, const QString &out_dir)
 {
@@ -529,14 +490,6 @@ QString centerObjOnDisk(const QString &srcPath, const QString &out_dir)
   }
   if (xmin > xmax) return srcPath;
 
-
-
-
-
-
-
-
-
   const double extX = xmax - xmin;
   const double extY = ymax - ymin;
   const double extZ = zmax - zmin;
@@ -558,7 +511,6 @@ QString centerObjOnDisk(const QString &srcPath, const QString &out_dir)
   }
   latAxis = static_cast<Axis>(3 - fwdAxis - up_axis);
 
-
   auto axMin = [&](Axis a) { return a == AX_X ? xmin : a == AX_Y ? ymin : zmin; };
   auto axMax = [&](Axis a) { return a == AX_X ? xmax : a == AX_Y ? ymax : zmax; };
   const double fwdMin  = axMin(fwdAxis), fwdMax = axMax(fwdAxis);
@@ -566,8 +518,6 @@ QString centerObjOnDisk(const QString &srcPath, const QString &out_dir)
   const double upMin   = axMin(up_axis);
   const double fwdC    = 0.5 * (fwdMin + fwdMax);
   const double latC    = 0.5 * (latMin + latMax);
-
-
 
   double unitScale = 1.0;
   if      (maxExt >= 200.0 && maxExt <= 800.0) unitScale = 1.0;
@@ -582,13 +532,6 @@ QString centerObjOnDisk(const QString &srcPath, const QString &out_dir)
   if (!out.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate))
     return srcPath;
   QTextStream os(&out);
-
-
-
-
-
-
-
 
   auto pickFromAxis = [](Axis a, double x, double y, double z) {
     return a == AX_X ? x : (a == AX_Y ? y : z);
@@ -611,7 +554,6 @@ QString centerObjOnDisk(const QString &srcPath, const QString &out_dir)
           const double centeredLat = rawLat - latC;
           const double centeredFwd = rawFwd - fwdC;
           const double centeredUp  = rawUp  - upMin;
-
 
           const double newX = centeredLat * unitScale;
           const double newY = centeredFwd * unitScale;
@@ -645,8 +587,6 @@ void openCalibrationViews(QTextStream &out, const QString &mesh_path,
     out << "  opening Qt3D calibration viewer - orbit/drag to inspect, close window to continue…\n";
     out.flush();
     if (spec) {
-
-
 
       std::array<float, 12> w{};
       for (size_t i = 0; i < 4; ++i) {
@@ -757,8 +697,6 @@ int runVehicleImportCli(int argc, char **argv)
     else if (a == "--tires"            && i + 1 < argc) tires_path = QString(argv[++i]);
     else if (a == "--mtl"              && i + 1 < argc) mtlPath   = QString(argv[++i]);
     else if (a == "--debug-merge-only") {
-
-
 
       qputenv("CARLA_VEHICLE_TEST_FIXTURES_DIR_DEBUG_MERGE_ONLY", "1");
     }
@@ -965,7 +903,6 @@ int runVehicleImportCli(int argc, char **argv)
       }
       UserKnobs knobs = detectKnobs(f.mesh_path);
 
-
       QString viewMeshPath = f.mesh_path;
       QString mergedPath;
       if (!tires_path.isEmpty()
@@ -982,8 +919,6 @@ int runVehicleImportCli(int argc, char **argv)
           mergedPath = mr.output_path;
           viewMeshPath = mergedPath;
           autoStageBodyMaterials(f.mesh_path, mergedPath);
-
-
 
           const QString centered = centerObjOnDisk(
               mergedPath, workspaceRoot() + "/centered_" + f.name + "_merged");
@@ -1003,8 +938,6 @@ int runVehicleImportCli(int argc, char **argv)
       } else if (!tires_path.isEmpty()) {
         out << "  --tires given but path is not a readable .obj - ignoring.\n";
       }
-
-
 
       if (mergedPath.isEmpty()
           && QFileInfo(f.mesh_path).suffix().toLower() == "obj") {
@@ -1028,8 +961,6 @@ int runVehicleImportCli(int argc, char **argv)
                  "importer will pick up materials at cook time.)\n";
         }
       }
-
-
 
       cs::VehicleSpec s = makeSpec(f, knobs, tires_path);
       promptKnobs(out, knobs, viewMeshPath, &s);

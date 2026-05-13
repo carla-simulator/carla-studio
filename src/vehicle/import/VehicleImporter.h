@@ -41,10 +41,6 @@ struct FVehicleImportSpec
   float Mass              = 1500.f;
   float SuspDamping       = 0.65f;
 
-
-
-
-
   float SourceScaleToCm   = 1.f;
   int32 SourceUpAxis      = 2;
   int32 SourceForwardAxis = 0;

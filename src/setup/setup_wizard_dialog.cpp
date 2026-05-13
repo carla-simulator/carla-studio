@@ -61,7 +61,7 @@ QString defaultUePath() {
 
 constexpr const char *kCommunityMaps[][2] = {
   { "Mcity Digital Twin",          "https://mcity.umich.edu/" },
-  { "Apollo HD Maps (Town01-05)",  "https://github.com/ApolloAuto/apollo" },
+  { "Apollo HD Maps (Town01-05)",  "https://github.com/MaisJamal/Carla_apollo_maps" },
 };
 
 void styleDot(QLabel *dot, bool ok) {

@@ -104,7 +104,6 @@ class VehiclePreviewPage : public QWidget {
     Qt3DCore::QTransform       *xform  = nullptr;
   };
 
-
   std::array<AlignRod, 10> m_align_rods{};
   QVector3D                m_last_wheel_pos[4]{};
 

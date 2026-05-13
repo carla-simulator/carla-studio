@@ -364,10 +364,6 @@ void writeBodyLinesScaledTranslated(QTextStream &out, const ParsedObj &body,
   }
 }
 
-
-
-
-
 void writeTranslatedTireCopy(QTextStream &out,
                              const ParsedObj &tires,
                              double tx, double ty, double tz,
@@ -380,16 +376,6 @@ void writeTranslatedTireCopy(QTextStream &out,
                              bool mirrorAxial = false) {
   out << "o " << copyName << "\n";
 
-
-
-
-
-
-
-
-
-
-
   const double m_ax = mirrorAxial ? -1.0 : 1.0;
   for (const ObjVertex &v : tires.vertices) {
     const double comp[3] = { v.x * sx * m_ax, v.y * sy, v.z * sz };
@@ -397,14 +383,6 @@ void writeTranslatedTireCopy(QTextStream &out,
         << " "  << QString::number(comp[permY] + ty, 'f', 6)
         << " "  << QString::number(comp[permZ] + tz, 'f', 6) << "\n";
   }
-
-
-
-
-
-
-
-
 
   for (const QString &line : tires.rawLines) {
     if (!line.startsWith(QStringLiteral("f "))
@@ -528,15 +506,6 @@ ObjMergeResult merge_body_and_tires(const QString &body_obj_path,
     return r;
   }
 
-
-
-
-
-
-
-
-
-
   double bxMin = 1e300, bxMax = -1e300;
   double byMin = 1e300, byMax = -1e300;
   double bzMin = 1e300, bzMax = -1e300;
@@ -556,10 +525,6 @@ ObjMergeResult merge_body_and_tires(const QString &body_obj_path,
   QTextStream os(&out);
   writeBodyLinesScaledTranslated(os, body, bsx, bsy, bsz, bcx, bcy, bcz);
 
-
-
-
-
   const double bextX = bxMax - bxMin;
   const double bextY = byMax - byMin;
   const double bextZ = bzMax - bzMin;
@@ -575,8 +540,6 @@ ObjMergeResult merge_body_and_tires(const QString &body_obj_path,
     bUpAxis = (bFwdAxis == 0) ? 1 : (bFwdAxis == 1 ? 2 : 0);
   const int bLatAxis = 3 - bFwdAxis - bUpAxis;
 
-
-
   int tire_perm[3];
   tire_perm[bLatAxis] = 0;
   tire_perm[bFwdAxis] = 1;
@@ -585,9 +548,6 @@ ObjMergeResult merge_body_and_tires(const QString &body_obj_path,
   const char *kCopyNames[4] = { "studio_tire_FL", "studio_tire_FR",
                                 "studio_tire_RL", "studio_tire_RR" };
 
-
-
-
   double anchorM[4][3];
   for (size_t i = 0; i < 4; ++i) {
     anchorM[i][0] = static_cast<double>(wheel_anchors[i].x) * bsx;
@@ -595,23 +555,15 @@ ObjMergeResult merge_body_and_tires(const QString &body_obj_path,
     anchorM[i][2] = static_cast<double>(wheel_anchors[i].z) * bsz;
   }
 
-
-
   int vertOffset = static_cast<int>(body.vertices.size());
   if (clusters.size() == 1) {
     const WheelCluster &src = clusters.front();
-
-
-
 
     const double centM[3] = { src.cx * tsx, src.cy * tsy, src.cz * tsz };
     for (size_t i = 0; i < 4; ++i) {
       const double tx = (anchorM[i][0] - bcx) - centM[tire_perm[0]];
       const double ty = (anchorM[i][1] - bcy) - centM[tire_perm[1]];
       const double tz = (anchorM[i][2] - bcz) - centM[tire_perm[2]];
-
-
-
 
       const bool isRight = (i == 1) || (i == 3);
       writeTranslatedTireCopy(os, tires, tx, ty, tz, kCopyNames[i],

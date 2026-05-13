@@ -107,7 +107,6 @@ ImportPipelineResult run_import_pipeline(const ImportPipelineInput &inIn,
     return res;
   }
 
-
   VehicleSpec spec = buildSpecFromInput(in);
   if (!in.tires_path.isEmpty()
       && QFileInfo(in.mesh_path).suffix().toLower() == "obj"
@@ -130,7 +129,6 @@ ImportPipelineResult run_import_pipeline(const ImportPipelineInput &inIn,
     }
   }
 
-
   emitLog(cb, QString("Sending spec to editor on port %1 (5-stage import; "
                        "30-90 s blocking)").arg(in.editor_port));
   const QJsonObject json = spec_to_json(spec);
@@ -150,7 +148,6 @@ ImportPipelineResult run_import_pipeline(const ImportPipelineInput &inIn,
     return res;
   }
   emitLog(cb, "[ OK ] import → " + res.asset_path);
-
 
   if (in.carla_shipping_root.isEmpty() || in.uproject_path.isEmpty()
       || in.editor_binary.isEmpty()) {
@@ -182,7 +179,6 @@ ImportPipelineResult run_import_pipeline(const ImportPipelineInput &inIn,
   }
   emitLog(cb, QString("deploy: OK - cooked=%1 copied=%2")
                 .arg(dr.cooked_files).arg(dr.files_copied));
-
 
   if (in.zip_cooked_output) {
     const QString cookedSrc = QFileInfo(in.uproject_path).absolutePath()

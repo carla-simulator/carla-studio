@@ -123,6 +123,83 @@
 #include <cerrno>
 #include <cstring>
 
+// ── SparklineWidget ──────────────────────────────────────────────────────────
+// Lightweight read-only history chart. No Q_OBJECT — pure paintEvent override.
+class SparklineWidget : public QWidget {
+public:
+    explicit SparklineWidget(int maxSamples = 90, QWidget *parent = nullptr)
+        : QWidget(parent), m_max(maxSamples) {
+        setMinimumHeight(38);
+        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        setAttribute(Qt::WA_TranslucentBackground);
+    }
+
+    void addSample(double pct) {
+        m_data.append(std::clamp(pct, 0.0, 800.0));
+        if (m_data.size() > m_max) m_data.removeFirst();
+        update();
+    }
+
+    void setColor(const QColor &c) { m_color = c; update(); }
+    double last() const { return m_data.isEmpty() ? 0.0 : m_data.last(); }
+
+protected:
+    void paintEvent(QPaintEvent *) override {
+        const int n = static_cast<int>(m_data.size());
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing);
+
+        const double W = width();
+        const double H = height();
+
+        if (n < 2) {
+            p.setPen(QPen(m_color.darker(160), 1, Qt::DashLine));
+            p.drawLine(QPointF(0, H * 0.75), QPointF(W, H * 0.75));
+            return;
+        }
+
+        const double maxVal = std::max(100.0,
+            *std::max_element(m_data.begin(), m_data.end()));
+
+        QPolygonF poly;
+        poly.reserve(n);
+        for (int i = 0; i < n; ++i) {
+            poly << QPointF(i * W / (n - 1),
+                            H - (m_data[i] / maxVal) * H * 0.88 - H * 0.06);
+        }
+
+        // Filled gradient area
+        QPolygonF fill = poly;
+        fill.prepend(QPointF(0, H));
+        fill.append(QPointF(W, H));
+        QLinearGradient grad(0, 0, 0, H);
+        QColor top = m_color; top.setAlpha(70);
+        QColor bot = m_color; bot.setAlpha(5);
+        grad.setColorAt(0, top);
+        grad.setColorAt(1, bot);
+        p.setBrush(grad);
+        p.setPen(Qt::NoPen);
+        p.drawPolygon(fill);
+
+        // Stroke
+        QPen pen(m_color, 1.5f, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+        p.setBrush(Qt::NoBrush);
+        p.setPen(pen);
+        p.drawPolyline(poly);
+
+        // Terminal dot
+        p.setBrush(m_color);
+        p.setPen(QPen(Qt::white, 1));
+        p.drawEllipse(poly.last(), 3, 3);
+    }
+
+private:
+    QVector<double> m_data;
+    QColor          m_color{0x21, 0x96, 0xF3};
+    int             m_max;
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 #if defined(Q_OS_LINUX) || defined(__linux__)
 #include <execinfo.h>
 #include <fcntl.h>
@@ -187,6 +264,7 @@
 #include "setup/setup_wizard_dialog.h"
 #include "vehicle/import/vehicle_preview_window.h"
 #include "vehicle/import/vehicle_import_container.h"
+#include "core/cli_entry_points.h"
 
 int runVehicleImportCli(int argc, char **argv);
 
@@ -780,11 +858,6 @@ static void carla_studio_signal_trace(int sig) {
 
 namespace {
 
-
-
-
-
-
 bool dispatchSubcommand(int argc, char *argv[]) {
   if (argc < 2) return false;
   const std::string sub = argv[1];
@@ -793,68 +866,111 @@ bool dispatchSubcommand(int argc, char *argv[]) {
     std::exit(runVehicleImportCli(argc, argv));
   }
 
-  std::string target;
-  if      (sub == "cleanup")        target = "carla-studio-cli_cleanup";
-  else if (sub == "run-test-suite") target = "test-suite_carla-studio-cli";
-  else if (sub == "setup")          target = "carla-studio-setup-wizard";
-  else if (sub == "launch") {
-    std::fprintf(stderr,
-      "carla-studio: 'launch' subcommand is not implemented yet - coming "
-      "as a CLI-mode shipping launcher in a follow-up.\n");
-    std::_Exit(2);
+  std::vector<char *> sub_argv;
+  sub_argv.reserve(static_cast<size_t>(argc - 1));
+  sub_argv.push_back(argv[0]);
+  for (int i = 2; i < argc; ++i) sub_argv.push_back(argv[i]);
+  sub_argv.push_back(nullptr);
+  const int sub_argc = static_cast<int>(sub_argv.size()) - 1;
+
+  if      (sub == "cleanup")                  std::exit(carla_cli_cleanup_main(sub_argc, sub_argv.data()));
+  else if (sub == "setup" || sub == "build")  std::exit(carla_cli_setup_main(sub_argc, sub_argv.data()));
+  else if (sub == "start" || sub == "launch") std::exit(carla_cli_start_main(sub_argc, sub_argv.data()));
+  else if (sub == "stop")                     std::exit(carla_cli_stop_main(sub_argc, sub_argv.data()));
+  else if (sub == "load-additional-maps")     std::exit(carla_cli_maps_main(sub_argc, sub_argv.data()));
+  else if (sub == "sensor")                   std::exit(carla_cli_sensor_main(sub_argc, sub_argv.data()));
+  else if (sub == "actuate")                  std::exit(carla_cli_actuate_main(sub_argc, sub_argv.data()));
+  else if (sub == "healthcheck")              std::exit(carla_cli_healthcheck_main(sub_argc, sub_argv.data()));
+  else if (sub == "cosim")                   std::exit(carla_cli_cosim_main(sub_argc, sub_argv.data()));
+  else if (sub == "preview")                 std::exit(carla_cli_preview_main(sub_argc, sub_argv.data()));
+  else if (sub == "scenario")                std::exit(carla_cli_scenario_main(sub_argc, sub_argv.data()));
+  else if (sub == "keepalive")               std::exit(carla_cli_keepalive_main(sub_argc, sub_argv.data()));
+  else if (sub == "stack")                   std::exit(carla_cli_stack_main(sub_argc, sub_argv.data()));
+  else if (sub == "run-test-suite") {
+    char selfPath[4096] = {0};
+    const ssize_t n = ::readlink("/proc/self/exe", selfPath, sizeof(selfPath) - 1);
+    std::string dir = (n > 0) ? (selfPath[n] = '\0', std::string(selfPath)) : std::string(".");
+    const auto pos = dir.find_last_of('/');
+    if (pos != std::string::npos) dir.resize(pos);
+    const std::string fullPath = dir + "/carla-studio-test-suite";
+    ::execv(fullPath.c_str(), sub_argv.data());
+    std::fprintf(stderr, "carla-studio: failed to exec test suite '%s': %s\n",
+                 fullPath.c_str(), std::strerror(errno));
+    std::_Exit(126);
   }
   else if (sub == "help" || sub == "--help" || sub == "-h") {
     std::printf(
       "carla-studio - CARLA Studio dispatcher\n\n"
-      "  carla-studio                       open the GUI (default)\n"
-      "  carla-studio vehicle-import [...]  one-shot import + cook + drive + zip\n"
-      "  carla-studio cleanup               kill stale CARLA Studio / UE processes\n"
+      "  carla-studio                                   open the GUI (default)\n"
+      "  carla-studio vehicle-import [...]              one-shot import + cook + drive + zip\n"
+      "  carla-studio cleanup                           kill stale CARLA Studio / UE processes\n"
       "  carla-studio run-test-suite [--update-documentation]  run full test suite\n"
-      "  carla-studio setup [...]           run the setup wizard (CARLA src/binary)\n"
-      "  carla-studio launch                CLI-mode CARLA launcher (TBD)\n"
-      "  carla-studio help                  this message\n");
+      "  carla-studio setup --directory <dir> --release <ver>  download CARLA binary\n"
+      "  carla-studio build --directory <dir> --branch <b> [--engine <path>]  build from source\n"
+      "  carla-studio start [--map <map>] [--port <rpc>]  launch CARLA simulator\n"
+      "  carla-studio stop                              stop running CARLA simulator\n"
+      "  carla-studio load-additional-maps <provider>   install community maps (mcity|apollo)\n"
+      "  carla-studio sensor fisheye --configure        print fisheye JSON config\n"
+      "  carla-studio sensor fisheye --viewport         open calibration viewport\n"
+      "  carla-studio actuate sae-l5|l4|l3|l2|l1|l0    set SAE autonomy level\n"
+      "  carla-studio actuate sae-l1 --keyboard         L1 with keyboard ego control\n"
+      "  carla-studio healthcheck [--host h] [--port p] environment & connectivity check\n"
+      "  carla-studio cosim [--directory <dir>]        TeraSim co-simulation\n"
+      "  carla-studio preview [--directory <dir>]      ROS2 preview control\n"
+      "  carla-studio scenario [--scenario <s>]        TeraSim scenario\n"
+      "  carla-studio keepalive [disable|enable|status|run]  system keepalive\n"
+      "  carla-studio stack [--terminator]             launch full cosim stack\n"
+      "  carla-studio stop --full                      stop full stack\n"
+      "  carla-studio help                              this message\n");
     std::fflush(stdout);
     std::exit(0);
   }
   else return false;
 
+  return true;
+}
 
-  char selfPath[4096] = {0};
-  const ssize_t n = ::readlink("/proc/self/exe", selfPath, sizeof(selfPath) - 1);
-  std::string dir;
-  if (n > 0) {
-    selfPath[n] = '\0';
-    dir = selfPath;
-    const auto pos = dir.find_last_of('/');
-    if (pos != std::string::npos) dir.resize(pos);
-  } else {
-    dir = ".";
+static void applyEnvironmentDefaults() {
+  QSettings app;
+
+  const QString iniPath = QCoreApplication::applicationDirPath() + "/cfg/env.ini";
+  const bool hasIni = QFileInfo::exists(iniPath);
+
+  // Read from env.ini if present, otherwise return the hardcoded fallback.
+  // Opens QSettings lazily per call; files this small are re-read from OS cache.
+  const auto iniStr = [&](const QString &key, const QString &def) -> QString {
+    if (!hasIni) return def;
+    return QSettings(iniPath, QSettings::IniFormat).value(key, def).toString().trimmed();
+  };
+  const auto setDefault = [&](const QString &key, const QVariant &val) {
+    if (!app.contains(key)) app.setValue(key, val);
+  };
+  const auto boolStr = [](const QString &s) -> bool {
+    const QString lo = s.toLower();
+    return lo == "true" || lo == "1" || lo == "yes";
+  };
+
+  if (!app.contains("render/quality_epic") && !app.contains("render/quality_low")) {
+    const QString q = iniStr("render/quality", "Epic");
+    app.setValue("render/quality_epic", q.compare("Epic", Qt::CaseInsensitive) == 0);
+    app.setValue("render/quality_low",  q.compare("Low",  Qt::CaseInsensitive) == 0);
   }
-  const std::string fullPath = dir + "/" + target;
+  setDefault("render/offscreen",     boolStr(iniStr("render/offscreen",    "false")));
+  setDefault("render/no_sound",      boolStr(iniStr("render/no_sound",     "false")));
+  setDefault("render/prefer_nvidia", boolStr(iniStr("render/prefer_nvidia", "true")));
+  setDefault("render/window_small",  boolStr(iniStr("render/window_small", "false")));
 
-
-  std::vector<char *> newArgv;
-  newArgv.reserve(static_cast<size_t>(argc));
-  newArgv.push_back(const_cast<char *>(fullPath.c_str()));
-  for (int i = 2; i < argc; ++i) newArgv.push_back(argv[i]);
-  newArgv.push_back(nullptr);
-
-  ::execv(fullPath.c_str(), newArgv.data());
-  std::fprintf(stderr,
-      "carla-studio: failed to exec '%s': %s\n"
-      "             (is the sibling binary built? "
-      "cmake --build … --target %s)\n",
-      fullPath.c_str(), std::strerror(errno), target.c_str());
-  std::_Exit(126);
+  if (qgetenv("CARLA_ROOT").isEmpty()) {
+    const QString root = iniStr("carla/root_path", "");
+    if (!root.isEmpty() && QFileInfo(root).isDir())
+      qputenv("CARLA_ROOT", root.toLocal8Bit());
+  }
 }
 
 }
 
 int main(int argc, char *argv[]) {
   if (dispatchSubcommand(argc, argv)) return 0;
-
-
-
 
   for (int s : {SIGSEGV, SIGBUS, SIGABRT, SIGFPE, SIGILL}) {
     std::signal(s, carla_studio_signal_trace);
@@ -929,6 +1045,8 @@ int main(int argc, char *argv[]) {
   QCoreApplication::setOrganizationDomain("carla.org");
   QCoreApplication::setApplicationName("CARLA Studio");
 
+  applyEnvironmentDefaults();
+
   StudioTheme currentTheme = detectInitialTheme();
   applyStudioTheme(app, currentTheme);
   bool darkMode = lastAppliedIsDark();
@@ -976,15 +1094,6 @@ int main(int argc, char *argv[]) {
 
   QGroupBox *launchGroup = new QGroupBox("Scenario");
   QVBoxLayout *launchLayout = new QVBoxLayout();
-
-
-
-
-
-
-
-
-
 
   auto discoverCarlaRoot = []() -> QString {
     const QString home = QDir::homePath();
@@ -1068,18 +1177,6 @@ int main(int argc, char *argv[]) {
     "Map loaded into the simulator at start. Refresh (⟳) repopulates "
     "from the running sim; + Maps installs additional packs.");
 
-
-
-
-
-
-
-
-
-
-
-
-
   scenarioSelect->addItems(QStringList() << "Town10HD_Opt");
   scenarioSelect->setCurrentIndex(0);
   scenarioSelect->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
@@ -1102,7 +1199,6 @@ int main(int argc, char *argv[]) {
   QAction *optRenderOffscreen = new QAction("Off-screen (-RenderOffScreen)", &window);
   optRenderOffscreen->setCheckable(true);
 
-
   QAction *optWindowSmall = new QAction("Windowed 640×480 (default)", &window);
   optWindowSmall->setCheckable(true);
   QAction *optQualityEpic = new QAction("Quality Epic (-quality-level=Epic)", &window);
@@ -1115,11 +1211,6 @@ int main(int argc, char *argv[]) {
   optRos2->setCheckable(true);
   QAction *optPreferNvidia = new QAction("Prefer NVIDIA (-prefernvidia)", &window);
   optPreferNvidia->setCheckable(true);
-
-
-
-
-
 
   optPreferNvidia->setChecked(true);
   {
@@ -1211,7 +1302,6 @@ int main(int argc, char *argv[]) {
   simRequiredButtons.push_back(cpvBtn);
   simRequiredButtons.push_back(bevBtn);
   for (QPushButton *b : {fpvBtn, tpvBtn, cpvBtn, bevBtn}) b->setEnabled(false);
-
 
   auto *viewBtnGroup = new QButtonGroup(&window);
   viewBtnGroup->setExclusive(true);
@@ -1612,40 +1702,108 @@ int main(int argc, char *argv[]) {
 
   QGroupBox *perfGroup = new QGroupBox("Processes");
   QVBoxLayout *perfLayout = new QVBoxLayout();
+
+  // ── Process table ─────────────────────────────────────────────────────────
   QTableWidget *carla_process_table = new QTableWidget();
   carla_process_table->setColumnCount(5);
-  carla_process_table->setHorizontalHeaderLabels(QStringList() << "PID" << "Process" << "CPU" << "Memory" << "GPU");
+  carla_process_table->setHorizontalHeaderLabels(
+    QStringList() << "PID" << "Process" << "CPU" << "Memory" << "GPU");
   carla_process_table->verticalHeader()->setVisible(false);
-  carla_process_table->setSelectionMode(QAbstractItemView::NoSelection);
+  carla_process_table->setSelectionMode(QAbstractItemView::SingleSelection);
+  carla_process_table->setSelectionBehavior(QAbstractItemView::SelectRows);
   carla_process_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
   carla_process_table->setFocusPolicy(Qt::NoFocus);
-  carla_process_table->setMinimumHeight(150);
+  carla_process_table->setMinimumHeight(120);
+  carla_process_table->setAlternatingRowColors(true);
   carla_process_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
-  carla_process_table->setColumnWidth(0, 64);
+  carla_process_table->setColumnWidth(0, 60);
   carla_process_table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Fixed);
-  carla_process_table->setColumnWidth(1, 96);
+  carla_process_table->setColumnWidth(1, 120);
   carla_process_table->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
   carla_process_table->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Stretch);
   carla_process_table->horizontalHeader()->setSectionResizeMode(4, QHeaderView::Stretch);
+  carla_process_table->setShowGrid(false);
+  carla_process_table->horizontalHeader()->setHighlightSections(false);
   perfLayout->addWidget(carla_process_table);
 
-  QGridLayout *processTotalsLayout = new QGridLayout();
-  processTotalsLayout->addWidget(new QLabel("Total CPU:"), 0, 0);
-  QProgressBar *totalCpuBar = new QProgressBar();
-  totalCpuBar->setRange(0, 100);
-  totalCpuBar->setFormat("0.0%");
-  processTotalsLayout->addWidget(totalCpuBar, 0, 1);
-  processTotalsLayout->addWidget(new QLabel("Total Memory:"), 1, 0);
-  QProgressBar *totalMemBar = new QProgressBar();
-  totalMemBar->setRange(0, 100);
-  totalMemBar->setFormat("0.0%");
-  processTotalsLayout->addWidget(totalMemBar, 1, 1);
-  processTotalsLayout->addWidget(new QLabel("Total GPU:"), 2, 0);
-  QProgressBar *totalGpuBar = new QProgressBar();
-  totalGpuBar->setRange(0, 100);
-  totalGpuBar->setFormat("n/a");
-  processTotalsLayout->addWidget(totalGpuBar, 2, 1);
-  perfLayout->addLayout(processTotalsLayout);
+  // ── Stat cards (CPU · Memory · GPU) ──────────────────────────────────────
+  // Each card: accent title | big live value | 4-px bar | sparkline history
+  SparklineWidget *cpuSparkline = new SparklineWidget(90);
+  cpuSparkline->setColor(QColor(0x21, 0x96, 0xF3));
+  SparklineWidget *memSparkline = new SparklineWidget(90);
+  memSparkline->setColor(QColor(0x4C, 0xAF, 0x50));
+  SparklineWidget *gpuSparkline = new SparklineWidget(90);
+  gpuSparkline->setColor(QColor(0xFF, 0x98, 0x00));
+
+  QLabel *cpuValueLabel = nullptr;
+  QLabel *memValueLabel = nullptr;
+  QLabel *gpuValueLabel = nullptr;
+  QLabel *cpuSubLabel   = nullptr;
+  QLabel *memSubLabel   = nullptr;
+  QLabel *gpuSubLabel   = nullptr;
+  QProgressBar *totalCpuBar = nullptr;
+  QProgressBar *totalMemBar = nullptr;
+  QProgressBar *totalGpuBar = nullptr;
+
+  auto makeStatCard = [&](const QString &title,
+                          QLabel *&bigLabel, QLabel *&subLabel,
+                          QProgressBar *&bar, SparklineWidget *spark,
+                          const QString &accent) -> QWidget * {
+    QFrame *card = new QFrame();
+    card->setObjectName("statCard");
+    card->setFrameShape(QFrame::StyledPanel);
+    card->setStyleSheet(
+      "QFrame#statCard {"
+      "  background: palette(base);"
+      "  border: 1px solid rgba(128,128,128,45);"
+      "  border-radius: 7px; }");
+    QVBoxLayout *cl = new QVBoxLayout(card);
+    cl->setContentsMargins(10, 7, 10, 7);
+    cl->setSpacing(2);
+
+    QLabel *titleLbl = new QLabel(title);
+    titleLbl->setStyleSheet(
+      QString("font-size: 10px; font-weight: 600; color: %1; "
+              "text-transform: uppercase; letter-spacing: 0.5px;")
+        .arg(accent));
+
+    bigLabel = new QLabel("—");
+    bigLabel->setStyleSheet(
+      QString("font-size: 22px; font-weight: 400; color: palette(text);"));
+
+    subLabel = new QLabel();
+    subLabel->setStyleSheet("font-size: 10px; color: palette(mid);");
+
+    bar = new QProgressBar();
+    bar->setRange(0, 100);
+    bar->setMaximumHeight(4);
+    bar->setTextVisible(false);
+    bar->setStyleSheet(QString(
+      "QProgressBar { border: none; border-radius: 2px;"
+      "  background: rgba(128,128,128,28); }"
+      "QProgressBar::chunk { border-radius: 2px; background: %1; }").arg(accent));
+
+    cl->addWidget(titleLbl);
+    cl->addWidget(bigLabel);
+    cl->addWidget(subLabel);
+    cl->addWidget(bar);
+    cl->addWidget(spark);
+    return card;
+  };
+
+  QWidget *cpuCard = makeStatCard("CPU", cpuValueLabel, cpuSubLabel,
+                                  totalCpuBar,  cpuSparkline, "#2196F3");
+  QWidget *memCard = makeStatCard("Memory",      memValueLabel, memSubLabel,
+                                  totalMemBar,  memSparkline, "#FF9800");
+  QWidget *gpuCard = makeStatCard("GPU",         gpuValueLabel, gpuSubLabel,
+                                  totalGpuBar,  gpuSparkline, "#4CAF50");
+
+  QHBoxLayout *statCardsRow = new QHBoxLayout();
+  statCardsRow->setSpacing(8);
+  statCardsRow->addWidget(cpuCard);
+  statCardsRow->addWidget(memCard);
+  statCardsRow->addWidget(gpuCard);
+  perfLayout->addLayout(statCardsRow);
 
   QHBoxLayout *procButtons = new QHBoxLayout();
   QPushButton *refreshProcBtn = new QPushButton("⟳");
@@ -1704,7 +1862,6 @@ int main(int argc, char *argv[]) {
     stopBtn->setEnabled(rootConfiguredOk);
     setSimReachable(state.startsWith("Running"));
 
-
     const bool isConnecting = isBusy && (state.contains("connecting", Qt::CaseInsensitive)
                                          || state.contains("Initializing", Qt::CaseInsensitive)
                                          || state.contains("loading", Qt::CaseInsensitive));
@@ -1746,7 +1903,7 @@ int main(int argc, char *argv[]) {
   auto discoverCarlaSimPids = [&]() {
     QProcess finder;
     finder.start("/bin/bash", QStringList() << "-lc"
-      << "pgrep -f 'CarlaUE[45]-Linux|UnrealEditor|CarlaUnreal' 2>/dev/null | head -10");
+      << "pgrep -f 'CarlaUE[45]-Linux-Shipping|CarlaUnreal-Linux-Shipping|UnrealEditor|CarlaUnreal|CarlaUE4|CarlaUE5' 2>/dev/null | head -20");
     finder.waitForFinished(1500);
     const QString out = QString::fromLocal8Bit(finder.readAllStandardOutput());
     for (const QString &token : out.split('\n', Qt::SkipEmptyParts)) {
@@ -1769,11 +1926,6 @@ int main(int argc, char *argv[]) {
   };
 
   auto killAllCarlaProcesses = [&]() {
-
-
-
-
-
 
     QProcess::execute("/bin/bash", QStringList() << "-lc"
         << "pkill -TERM -f 'CarlaUE4|CarlaUE5|CarlaUnreal|CarlaUE' 2>/dev/null || true");
@@ -2426,9 +2578,6 @@ int main(int argc, char *argv[]) {
     const QString root = carla_root_path->text().trimmed();
     if (root.isEmpty()) return QString();
 
-
-
-
     for (const QString &p : { root + "/VERSION", root + "/version.txt" }) {
       QFile f(p);
       if (f.open(QIODevice::ReadOnly)) {
@@ -2438,8 +2587,6 @@ int main(int argc, char *argv[]) {
     }
     QRegularExpression dirVer("CARLA[_-]v?([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)",
                               QRegularExpression::CaseInsensitiveOption);
-
-
 
     QString cur = root;
     for (int i = 0; i < 3 && !cur.isEmpty(); ++i) {
@@ -2504,7 +2651,6 @@ int main(int argc, char *argv[]) {
   auto validateCarlaRoot = [&]() {
     const QString path = carla_root_path->text().trimmed();
 
-
     const bool hasUE4    = QFileInfo(path + "/CarlaUE4.sh").isFile();
     const bool hasUE5    = QFileInfo(path + "/CarlaUE5.sh").isFile();
     const bool hasUnreal = QFileInfo(path + "/CarlaUnreal.sh").isFile();
@@ -2514,9 +2660,6 @@ int main(int argc, char *argv[]) {
       const QString envLower = envUnrealPath.toLower();
       if (envLower.contains("ue5") || envLower.contains("unrealengine5") || envLower.contains("5.")) return "Unreal 5";
       if (envLower.contains("ue4") || envLower.contains("unrealengine4") || envLower.contains("4.")) return "Unreal 4";
-
-
-
 
       if (hasUE5 && !hasUE4) return "Unreal 5";
       if (hasUE4 && !hasUE5) return "Unreal 4";
@@ -2562,13 +2705,8 @@ int main(int argc, char *argv[]) {
       args << "-RenderOffScreen";
     } else if (optWindowSmall->isChecked()) {
 
-
-
       args << "-windowed" << "-ResX=640" << "-ResY=480";
     }
-
-
-
 
     if (optQualityLow->isChecked()) {
       args << "-quality-level=Low";
@@ -2588,9 +2726,6 @@ int main(int argc, char *argv[]) {
     }
     return args;
   };
-
-
-
 
   auto fitCarlaWindowToSafeSize = []() {
     auto *poll = new QTimer();
@@ -2655,22 +2790,13 @@ int main(int argc, char *argv[]) {
     if (on && optRenderOffscreen->isChecked()) optRenderOffscreen->setChecked(false);
   });
 
-
-
-
   {
     QSettings s;
     optQualityLow->setChecked(s.value("render/quality_low",     true ).toBool());
     optQualityEpic->setChecked(s.value("render/quality_epic",   false).toBool());
     optNoSound->setChecked(s.value("render/no_sound",           true ).toBool());
 
-
-
-
-
     optWindowSmall->setChecked(s.value("render/window_small",   true ).toBool());
-
-
 
     optRenderOffscreen->setChecked(s.value("render/offscreen", true).toBool());
   }
@@ -2741,9 +2867,6 @@ int main(int argc, char *argv[]) {
     sorted.sort(Qt::CaseInsensitive);
     scenarioSelect->clear();
 
-
-
-
     scenarioSelect->addItems(sorted);
     const int idx = scenarioSelect->findText(previous);
     scenarioSelect->setCurrentIndex(idx >= 0 ? idx : 0);
@@ -2779,8 +2902,6 @@ int main(int argc, char *argv[]) {
   setProcessAreaEnabled(false);
 
   refreshProcessList = [&]() {
-
-
 
     discoverCarlaSimPids();
     totalCpuBar->setValue(0);
@@ -3002,72 +3123,69 @@ int main(int argc, char *argv[]) {
 
     carla_process_table->setRowCount(row);
 
-    auto styleTotalBar = [](QProgressBar *b) {
-      b->setAlignment(Qt::AlignCenter);
-      b->setTextVisible(true);
-      b->setMinimumHeight(28);
-      b->setMinimumWidth(240);
-    };
+    const double cpuAggregate = std::max(0.0, std::min(100.0, totalCpu));
+    const double memAggregate = std::max(0.0, std::min(100.0, totalMem));
 
-    auto applyThresholdChunk = [](QProgressBar *b, double pct) {
-      const char *color = "#2196F3";
+    // ── Threshold-aware bar color (shared for all three cards) ────────────
+    auto cardBarColor = [](QProgressBar *b, double pct, const QString &base) {
+      QString color = base;
       if (pct >= 95.0)      color = "#C64545";
       else if (pct >= 75.0) color = "#D9A13A";
       b->setStyleSheet(QString(
-        "QProgressBar { border: 1px solid rgba(0,0,0,50); border-radius: 4px; "
-        "text-align: center; background: palette(base); }"
-        "QProgressBar::chunk { background-color: %1; border-radius: 3px; }").arg(color));
+        "QProgressBar { border: none; border-radius: 2px;"
+        "  background: rgba(128,128,128,28); }"
+        "QProgressBar::chunk { border-radius: 2px; background: %1; }").arg(color));
     };
 
-    const double cpuAggregate = std::max(0.0, std::min(100.0, totalCpu));
-    const double memAggregate = std::max(0.0, std::min(100.0, totalMem));
-    styleTotalBar(totalCpuBar);
-    styleTotalBar(totalMemBar);
-    styleTotalBar(totalGpuBar);
-
+    // ── CPU card ──────────────────────────────────────────────────────────
     totalCpuBar->setValue(static_cast<int>(std::round(cpuAggregate)));
-    totalCpuBar->setFormat(
-      QString("%1%  ·  %2 cores")
-        .arg(totalCpu, 0, 'f', 1)
-        .arg(totalCpu / 100.0, 0, 'f', 2));
+    cpuValueLabel->setText(QString("%1%").arg(totalCpu, 0, 'f', 1));
+    cpuSubLabel->setText(QString("≈ %1 cores active")
+                           .arg(totalCpu / 100.0, 0, 'f', 2));
+    cpuSparkline->addSample(totalCpu);
+    cardBarColor(totalCpuBar, cpuAggregate, "#2196F3");
     totalCpuBar->setToolTip(
       QString("Aggregate CPU across CARLA processes: %1% (≈ %2 cores active)")
-        .arg(totalCpu, 0, 'f', 1)
-        .arg(totalCpu / 100.0, 0, 'f', 2));
-    applyThresholdChunk(totalCpuBar, cpuAggregate);
+        .arg(totalCpu, 0, 'f', 1).arg(totalCpu / 100.0, 0, 'f', 2));
 
+    // ── Memory card ───────────────────────────────────────────────────────
     totalMemBar->setValue(static_cast<int>(std::round(memAggregate)));
     const QString memBottom = systemRamMiB > 0
       ? QString("%1 / %2").arg(fmtMiB(totalMemMiB), fmtMiB(double(systemRamMiB)))
       : fmtMiB(totalMemMiB);
-    totalMemBar->setFormat(QString("%1%  ·  %2").arg(totalMem, 0, 'f', 1).arg(memBottom));
+    memValueLabel->setText(fmtMiB(totalMemMiB));
+    memSubLabel->setText(systemRamMiB > 0
+      ? QString("%1% of system RAM").arg(totalMem, 0, 'f', 1)
+      : QString("%1%").arg(totalMem, 0, 'f', 1));
+    memSparkline->addSample(totalMem);
+    cardBarColor(totalMemBar, memAggregate, "#4CAF50");
     totalMemBar->setToolTip(
       QString("Aggregate memory across CARLA processes: %1% (%2)")
-        .arg(totalMem, 0, 'f', 1)
-        .arg(memBottom));
-    applyThresholdChunk(totalMemBar, memAggregate);
+        .arg(totalMem, 0, 'f', 1).arg(memBottom));
 
+    // ── GPU card ──────────────────────────────────────────────────────────
     if (gpuRows > 0) {
       const double gpuAggregate = std::max(0.0, std::min(100.0, totalGpu));
       totalGpuBar->setValue(static_cast<int>(std::round(gpuAggregate)));
-      totalGpuBar->setFormat(
-        QString("%1%  ·  %2 MiB")
-          .arg(totalGpu, 0, 'f', 1)
-          .arg(qint64(totalGpuMiB)));
+      gpuValueLabel->setText(QString("%1%").arg(totalGpu, 0, 'f', 1));
+      gpuSubLabel->setText(totalGpuMiB > 0
+        ? QString("%1 MiB VRAM").arg(qint64(totalGpuMiB))
+        : QString("SM util"));
+      gpuSparkline->addSample(totalGpu);
+      cardBarColor(totalGpuBar, gpuAggregate, "#FF9800");
       totalGpuBar->setToolTip(
         QString("Aggregate GPU across CARLA processes: %1% (%2 MiB)")
-          .arg(totalGpu, 0, 'f', 1)
-          .arg(qint64(totalGpuMiB)));
-      applyThresholdChunk(totalGpuBar, gpuAggregate);
+          .arg(totalGpu, 0, 'f', 1).arg(qint64(totalGpuMiB)));
     } else {
       totalGpuBar->setValue(0);
-      totalGpuBar->setFormat("n/a");
-      totalGpuBar->setToolTip(
-        "No GPU usage reported by CARLA processes (or GPU telemetry unavailable on this host).");
+      gpuValueLabel->setText("n/a");
+      gpuSubLabel->setText("no GPU telemetry");
       totalGpuBar->setStyleSheet(
-        "QProgressBar { border: 1px solid rgba(0,0,0,50); border-radius: 4px; "
-        "text-align: center; background: palette(base); }"
-        "QProgressBar::chunk { background-color: #9E9E9E; }");
+        "QProgressBar { border: none; border-radius: 2px;"
+        "  background: rgba(128,128,128,28); }"
+        "QProgressBar::chunk { background: #9E9E9E; }");
+      totalGpuBar->setToolTip(
+        "No GPU usage reported (nvidia-smi not available or no NVIDIA GPU).");
     }
 
     refreshRememberedPidList();
@@ -3082,7 +3200,6 @@ int main(int argc, char *argv[]) {
   QTimer *inAppCameraTick = new QTimer(&window);
   inAppCameraTick->setInterval(80);
 
-
   QDockWidget *viewDock = nullptr;
   QVBoxLayout *viewGridLayout = nullptr;
   QMap<QString, QGroupBox *> viewTiles;
@@ -3094,10 +3211,6 @@ int main(int argc, char *argv[]) {
   carla::SharedPtr<cc::Vehicle> in_app_drive_vehicle;
   bool inAppDriveSpawnedVehicle = false;
 
-
-
-
-
   enum class SelfDriveMode {
     Off              = 0,
     ACC              = 1,
@@ -3108,11 +3221,6 @@ int main(int argc, char *argv[]) {
   };
   std::unique_ptr<carla::agents::navigation::BehaviorAgent> selfDriveAgent;
   SelfDriveMode selfDriveMode = SelfDriveMode::Off;
-
-
-
-
-
 
   auto pickForwardDestination = [&](const cg::Transform &from,
                                      float maxDist = 400.0f,
@@ -3135,7 +3243,6 @@ int main(int argc, char *argv[]) {
         if (dist < 60.0f || dist > maxDist) continue;
         const float dotForward = (dx * fwd.x + dy * fwd.y) / dist;
         if (dotForward < minDot) continue;
-
 
         const float score = dotForward * std::min(dist, 800.0f);
         if (score > bestScore) {
@@ -3166,8 +3273,6 @@ int main(int argc, char *argv[]) {
       }
       auto agent = std::make_unique<BA>(in_app_drive_vehicle, behavior);
       const auto vt = in_app_drive_vehicle->GetTransform();
-
-
 
       const bool isAuto = (mode == SelfDriveMode::AutonomousLoop);
       const float destMaxDist = isAuto ? 20000.0f : 400.0f;
@@ -3225,9 +3330,6 @@ int main(int argc, char *argv[]) {
       const auto vehicleTransform = in_app_drive_vehicle->GetTransform();
       const double yawRad = static_cast<double>(vehicleTransform.rotation.yaw) * M_PI / 180.0;
 
-
-
-
       const float cameraDistance = 6.0f;
       cg::Location cameraLocation = vehicleTransform.location;
       cameraLocation.x -= static_cast<float>(std::cos(yawRad) * cameraDistance);
@@ -3246,12 +3348,8 @@ int main(int argc, char *argv[]) {
     }
     carla::rpc::VehicleControl control;
 
-
     if (selfDriveAgent && selfDriveMode != SelfDriveMode::Off) {
       try {
-
-
-
 
         if (selfDriveMode == SelfDriveMode::AutonomousLoop &&
             selfDriveAgent->Done()) {
@@ -3261,7 +3359,6 @@ int main(int argc, char *argv[]) {
           }
         }
         control = selfDriveAgent->RunStep();
-
 
         if (selfDriveMode == SelfDriveMode::ACC) {
           if (driveKeys.steerLeft == driveKeys.steerRight) {
@@ -3309,10 +3406,6 @@ int main(int argc, char *argv[]) {
     stopInAppDriver();
     try {
 
-
-
-
-
       std::string hostStr = host.toStdString();
       if (hostStr == "localhost" || hostStr == "::1") {
         hostStr = "127.0.0.1";
@@ -3320,23 +3413,6 @@ int main(int argc, char *argv[]) {
       std::cerr << "[in-app driver] connecting to " << hostStr
                 << ":" << port << " (scenario=\"" << scenarioName.toStdString()
                 << "\")\n";
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
       auto tcpOpen = [&hostStr, port]() -> bool {
         int fd = ::socket(AF_INET, SOCK_STREAM, 0);
@@ -3353,9 +3429,6 @@ int main(int argc, char *argv[]) {
         ::close(fd);
         return open;
       };
-
-
-
 
       auto rpcReadyProbe = [&, last_err = std::string()]() mutable -> bool {
         if (!tcpOpen()) return false;
@@ -3379,10 +3452,6 @@ int main(int argc, char *argv[]) {
           return false;
         }
       };
-
-
-
-
 
       auto waitFor = [&](const char *label,
                          const std::function<bool()> &probe,
@@ -3414,7 +3483,6 @@ int main(int argc, char *argv[]) {
                                   .arg(qint64(elapsed)));
           }
 
-
           for (int i = 0; i < 5 && launchRequestedOrRunning; ++i) {
             QApplication::processEvents(QEventLoop::AllEvents, 50);
           }
@@ -3423,13 +3491,10 @@ int main(int argc, char *argv[]) {
         return false;
       };
 
-
       if (!waitFor("rpc-ready", rpcReadyProbe)) {
         setSimulationStatus("Idle");
         return false;
       }
-
-
 
       auto worldQueryable = [&]() -> bool {
         try {
@@ -3437,11 +3502,6 @@ int main(int argc, char *argv[]) {
           return true;
         } catch (...) { return false; }
       };
-
-
-
-
-
 
       const QString chosenMap = scenarioName.trimmed();
       const bool wantMinimal = false;
@@ -3459,7 +3519,6 @@ int main(int argc, char *argv[]) {
               params.max_road_length = 500.0;
 
               params.wall_height = 1.5;
-
 
               params.additional_width = 50.0;
               params.smooth_junctions = true;
@@ -3498,11 +3557,6 @@ int main(int argc, char *argv[]) {
 
       auto world = inAppDriveClient->GetWorld();
 
-
-
-
-
-
       carla::SharedPtr<cc::ActorList> actors;
       try {
         std::cerr << "[in-app driver] step: GetActors\n";
@@ -3535,15 +3589,6 @@ int main(int argc, char *argv[]) {
           return false;
         }
 
-
-
-
-
-
-
-
-
-
         cg::Transform spawn;
         if (wantMinimal) {
           spawn = cg::Transform(cg::Location(50.0f, -1.75f, 0.5f),
@@ -3566,10 +3611,6 @@ int main(int argc, char *argv[]) {
             return false;
           }
         }
-
-
-
-
 
         auto bp = vehicleBps->at(0u);
         if (bp.ContainsAttribute("role_name")) {
@@ -3596,9 +3637,6 @@ int main(int argc, char *argv[]) {
       }
 
       in_app_drive_vehicle->SetAutopilot(false);
-
-
-
 
       try {
         auto wt = inAppDriveClient->GetWorld();
@@ -3738,19 +3776,10 @@ int main(int argc, char *argv[]) {
       } catch (...) {}
 #endif
 
-
-
-
-
-
-
-
       try {
         auto wt = inAppDriveClient->GetWorld();
         auto lib = wt.GetBlueprintLibrary();
         if (lib) {
-
-
 
           auto bpContainsWord = [](const std::string &lc, const std::string &word) {
             size_t pos = lc.find(word);
@@ -3781,7 +3810,6 @@ int main(int argc, char *argv[]) {
               cherryBpId = id;
             }
 
-
             if (fallbackTreeId.empty() && !bpContainsWord(lc, "palm")
                 && (bpContainsWord(lc, "tree") || bpContainsWord(lc, "bush")
                     || bpContainsWord(lc, "pine") || bpContainsWord(lc, "oak")
@@ -3793,7 +3821,6 @@ int main(int argc, char *argv[]) {
 
           std::cerr << "[in-app driver] tree blueprints: palm=\"" << palmBpId
                     << "\" cherry=\"" << cherryBpId << "\"\n";
-
 
           const float interval  = 804.0f;
           const float roadLen   = 16093.0f;
@@ -3829,11 +3856,6 @@ int main(int argc, char *argv[]) {
         std::cerr << "[in-app driver] tree spawn: " << e.what() << '\n';
       } catch (...) {}
 
-
-
-
-
-
       try {
         auto wt = inAppDriveClient->GetWorld();
         auto dbg = wt.MakeDebugHelper();
@@ -3841,20 +3863,16 @@ int main(int argc, char *argv[]) {
         const C white{255, 255, 255, 255};
         const C yellow{255, 210, 0,   255};
 
-
         dbg.DrawString(cg::Location(125.0f,  0.0f, 1.8f), "CARLA",
                        true, yellow, -1.0f, true);
 
         dbg.DrawString(cg::Location(98.0f,   0.0f, 0.8f), "START",
                        true, white, -1.0f, true);
 
-
         const float rHW = 5.5f;
         dbg.DrawLine(cg::Location(92.0f, -rHW, 0.12f),
                      cg::Location(92.0f,  rHW, 0.12f),
                      0.30f, white, -1.0f, true);
-
-
 
         for (int xi = 0; xi < 4; ++xi) {
           for (int yi = 0; yi < 11; ++yi) {
@@ -3870,10 +3888,6 @@ int main(int argc, char *argv[]) {
         }
         std::cerr << "[in-app driver] start-line decoration drawn\n";
       } catch (...) {}
-
-
-
-
 
       try {
         auto wt = inAppDriveClient->GetWorld();
@@ -3902,9 +3916,6 @@ int main(int argc, char *argv[]) {
       return false;
     }
   };
-
-
-
 
   QObject::connect(inAppDriveTick, &QTimer::timeout, &window, [&]() {
     try {
@@ -4059,7 +4070,6 @@ int main(int argc, char *argv[]) {
       auto camera = std::static_pointer_cast<cc::Sensor>(rawActor);
       if (!camera) return;
 
-
       QGroupBox *tile = new QGroupBox(tileTitle);
       QVBoxLayout *tileLayout = new QVBoxLayout(tile);
       tileLayout->setContentsMargins(4, 4, 4, 4);
@@ -4095,7 +4105,6 @@ int main(int argc, char *argv[]) {
 
       activeViewSensors.insert(mode, camera);
       viewTiles.insert(mode, tile);
-
 
       auto setViewBtn = [&](const QString &m, bool on) {
         if      (m == "FPV") { QSignalBlocker b(fpvBtn); fpvBtn->setChecked(on); }
@@ -4258,7 +4267,6 @@ int main(int argc, char *argv[]) {
     killTrackedPids();
     killAllCarlaProcesses();
 
-
     if (!g_dockerContainerId.isEmpty()) {
       QProcess::startDetached("docker",
         QStringList() << "stop" << g_dockerContainerId.left(12));
@@ -4269,6 +4277,61 @@ int main(int argc, char *argv[]) {
     refreshProcessList();
     setSimulationStatus("Stopped");
   });
+
+  struct LaunchableBinary {
+    QString path;
+    bool    clearEngineIni = false;
+  };
+
+  auto findLaunchable = [](const QString &rootPath) -> LaunchableBinary {
+    struct Candidate { const char *rel; bool clearIni; };
+#if defined(Q_OS_WIN)
+    static const Candidate kCandidates[] = {
+      {"CarlaUnreal.exe",                false},
+      {"CarlaUE5.exe",                   false},
+      {"CarlaUE4.exe",                   false},
+      {"WindowsNoEditor/CarlaUE4.exe",   false},
+    };
+#elif defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+    static const Candidate kCandidates[] = {
+      {"CarlaUE4.app/Contents/MacOS/CarlaUE4", false},
+      {"CarlaUE5.app/Contents/MacOS/CarlaUE5", false},
+      {"CarlaUnreal.sh",                 true},
+      {"CarlaUE5.sh",                    false},
+      {"CarlaUE4.sh",                    false},
+    };
+#else
+    static const Candidate kCandidates[] = {
+      {"CarlaUnreal-Linux-Shipping",            false},
+      {"CarlaUnreal.sh",                        true},
+      {"CarlaUE5.sh",                           false},
+      {"CarlaUE4.sh",                           false},
+      {"LinuxNoEditor/CarlaUE4.sh",             false},
+      {"LinuxNoEditor/CarlaUE4-Linux-Shipping", false},
+      {"Binaries/Linux/CarlaUnreal",            false},
+      {"Binaries/Linux/CarlaUE4-Linux-Shipping",false},
+    };
+#endif
+    const int nCandidates = static_cast<int>(sizeof(kCandidates)/sizeof(kCandidates[0]));
+
+    for (int i = 0; i < nCandidates; ++i) {
+      const QString abs = rootPath + "/" + kCandidates[i].rel;
+      if (QFileInfo(abs).isFile()) return {abs, kCandidates[i].clearIni};
+    }
+
+    // search one level of subdirectories (versioned extracts: Carla-0.10.0/, CARLA_0.9.15/, etc.)
+    const QStringList subdirs = QDir(rootPath).entryList(
+      QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name | QDir::Reversed);
+    for (const QString &sub : subdirs) {
+      const QString subRoot = rootPath + "/" + sub;
+      for (int i = 0; i < nCandidates; ++i) {
+        const QString abs = subRoot + "/" + kCandidates[i].rel;
+        if (QFileInfo(abs).isFile()) return {abs, kCandidates[i].clearIni};
+      }
+    }
+
+    return {};
+  };
 
   QObject::connect(startBtn, &QPushButton::clicked, &window, [&]() {
     if (launchRequestedOrRunning) {
@@ -4290,18 +4353,18 @@ int main(int argc, char *argv[]) {
       }
       const QString rootPath = carla_root_path->text().trimmed();
 
-
-      QString scriptPath = rootPath + "/CarlaUnreal.sh";
-      if (!QFileInfo(scriptPath).isFile()) {
-        scriptPath = rootPath + "/CarlaUE5.sh";
+      const LaunchableBinary launchable = findLaunchable(rootPath);
+      if (launchable.path.isEmpty()) {
+        QMessageBox::warning(&window, "CARLA binary not found",
+          QString("No launchable binary found in:\n  %1\n\n"
+                  "Expected CarlaUnreal.sh, CarlaUE5.sh, CarlaUE4.sh, "
+                  "CarlaUnreal-Linux-Shipping, or a versioned sub-directory "
+                  "(e.g. Carla-0.10.0/).")
+              .arg(rootPath));
+        setSimulationStatus("Idle");
+        return;
       }
-      if (!QFileInfo(scriptPath).isFile()) {
-        scriptPath = rootPath + "/CarlaUE4.sh";
-      }
-
-
-
-
+      const QString scriptPath = launchable.path;
 
       bool carlaAlreadyRunning = false;
       {
@@ -4312,10 +4375,6 @@ int main(int argc, char *argv[]) {
         carlaAlreadyRunning = (probe.exitCode() == 0);
       }
 
-
-
-
-
       qint64 launchDelayMs = 1500;
       if (carlaAlreadyRunning) {
         setSimulationStatus(QString("Running (attaching to existing CARLA on port %1)")
@@ -4324,23 +4383,11 @@ int main(int argc, char *argv[]) {
       } else {
         QStringList modeArgs;
 
-
-
-
-
-
-
-
-
-
-
-
-        if (scriptPath.endsWith("/CarlaUnreal.sh")) {
+        if (launchable.clearEngineIni) {
           QFile::remove(QDir::homePath() +
                         "/.config/Epic/CarlaUnreal/Saved/Config/Linux/Engine.ini");
         }
         modeArgs << getSelectedLaunchArgs();
-
 
         modeArgs << QString("-carla-rpc-port=%1").arg(launchPort)
                  << QString("-carla-streaming-port=%1").arg(launchPort + 1);
@@ -4363,10 +4410,6 @@ int main(int argc, char *argv[]) {
         if (ok) {
           rememberPid(pid);
 
-
-
-
-
           QTimer::singleShot(30000, &window, [pid, &window, &setSimulationStatus]() {
             if (carla_studio_proc::pid_is_alive(pid)) return;
             QProcess tailProc;
@@ -4375,7 +4418,6 @@ int main(int argc, char *argv[]) {
             tailProc.waitForFinished(2000);
             const QString tail = QString::fromLocal8Bit(
                 tailProc.readAllStandardOutput()).trimmed();
-
 
             setSimulationStatus("Idle");
             QMessageBox box(QMessageBox::Critical, "CARLA simulator crashed at startup",
@@ -4388,13 +4430,9 @@ int main(int argc, char *argv[]) {
         }
       }
 
-
-
-
       QTimer::singleShot(launchDelayMs, &window, [=, &window]() {
         launchSelectedDriverMode(rootPath, target, launchPort, scenarioName);
       });
-
 
       if (!optRenderOffscreen->isChecked()) {
         fitCarlaWindowToSafeSize();
@@ -6330,10 +6368,6 @@ int main(int argc, char *argv[]) {
   updateEndpoint();
   refreshProcessList();
 
-
-
-
-
   {
     QTimer *procPoll = new QTimer(&window);
     procPoll->setInterval(2000);
@@ -6846,6 +6880,9 @@ int main(int argc, char *argv[]) {
     sensorAssemblyIcon = QIcon(pm);
   }
 
+  QDockWidget *previewDock = nullptr;
+  std::function<void(const QString &)> addPreviewTileByName;
+
   auto makeCompactCategory = [&](const QString &title, const QStringList &sensorNames, QLabel *countText,
                                  std::vector<QCheckBox *> &checks, std::vector<QPushButton *> &gears,
                                  std::vector<QPushButton *> &pluses, std::vector<QLabel *> &sensor_count_labels,
@@ -6935,7 +6972,9 @@ int main(int argc, char *argv[]) {
         "Open a live preview tile for this sensor (%1).").arg(sensor_name));
       QObject::connect(sensorPreview, &QPushButton::clicked, &window,
         [&, sensor_name]() {
-          if (openSensorConfigDialog) openSensorConfigDialog(sensor_name);
+          addPreviewTileByName(sensor_name);
+          previewDock->show();
+          previewDock->raise();
         });
       sensorRow->addWidget(sensorCheck);
       sensorRow->addWidget(sensorPlus);
@@ -7124,34 +7163,37 @@ int main(int argc, char *argv[]) {
   struct ProtocolDef {
     const char *name;
     const char *tooltip;
-    enum class Detector { None, Ros, Can, SomeIp, Tsn };
+    enum class Detector {
+      None, Ros, Can, SomeIp, Tsn,
+      Lin, FlexRay, Most, AutomotiveEth, Grpc, Dsrc, CellularV2x, Xcp
+    };
     Detector detector;
   };
   static const std::array<ProtocolDef, 12> kProtocols = {{
     { "LIN",
       "Local Interconnect Network - low-speed in-vehicle bus (~20 Kbps). "
       "Window controls, seat modules, climate systems. Always subordinate "
-      "to CAN (master/slave). Rarely simulated in CARLA unless modelling "
-      "body electronics. Requires plugged-in hardware to show status.",
-      ProtocolDef::Detector::None },
+      "to CAN (master/slave). Detected via sllin kernel module, lin* "
+      "network interfaces, PEAK plin* devices, or LIN daemon processes.",
+      ProtocolDef::Detector::Lin },
     { "FlexRay",
       "Deterministic time-triggered bus (up to 10 Mbps). Drive-by-wire and "
-      "safety-critical control. Now declining - being replaced by "
-      "Automotive Ethernet. Requires plugged-in hardware to show status.",
-      ProtocolDef::Detector::None },
+      "safety-critical control. Now declining — being replaced by Automotive "
+      "Ethernet. Detected via flexray kernel module, Peak/Vector FlexRay "
+      "hardware, or CANoe/CANalyzer processes.",
+      ProtocolDef::Detector::FlexRay },
     { "MOST",
       "Media Oriented Systems Transport - infotainment audio/video, often "
-      "fiber-based. Mostly legacy; Ethernet has taken over. "
-      "Requires plugged-in hardware to show status.",
-      ProtocolDef::Detector::None },
+      "fiber-based. Mostly legacy; Ethernet has taken over. Detected via "
+      "INIC USB devices, mostd daemon, or /dev/most* character devices.",
+      ProtocolDef::Detector::Most },
     { "Automotive Eth",
       "Automotive Ethernet (100BASE-T1, 1000BASE-T1, …). The modern "
       "high-bandwidth backbone: 100 Mbps → multi-Gbps. Replacing "
       "CAN/FlexRay for sensor data (cameras, radar), central compute, "
-      "ADAS/AV systems. Closest real-vehicle match for high-bandwidth "
-      "CARLA data paths. Requires plugged-in hardware (100BASE-T1 / "
-      "1000BASE-T1 PHY) to show status.",
-      ProtocolDef::Detector::None },
+      "ADAS/AV systems. Detected via 100BASE-T1/1000BASE-T1 PHY drivers, "
+      "Open Alliance SPI adapters, or AVB/TSN bridge daemons.",
+      ProtocolDef::Detector::AutomotiveEth },
     { "TSN",
       "Time-Sensitive Networking - extension of Ethernet with "
       "deterministic timing. Guarantees latency and synchronisation for "
@@ -7173,27 +7215,28 @@ int main(int argc, char *argv[]) {
     { "gRPC",
       "Google RPC over HTTP/2 - high-performance RPC. Not automotive-"
       "specific but increasingly used in internal microservices and "
-      "cloud-connected vehicle systems (software-defined vehicles).",
-      ProtocolDef::Detector::None },
+      "cloud-connected vehicle systems (software-defined vehicles). "
+      "Detected via libgrpc install, active listeners on port 50051, "
+      "or gRPC-enabled bridge processes.",
+      ProtocolDef::Detector::Grpc },
     { "DSRC",
       "Dedicated Short-Range Communications - early V2X standard "
       "(802.11p-based). Vehicle-to-vehicle / vehicle-to-infrastructure "
-      "messaging. Requires plugged-in hardware (802.11p radio) to "
-      "show status.",
-      ProtocolDef::Detector::None },
+      "messaging. Detected via 802.11p/OCB-mode wireless interface, "
+      "waved/wsmd daemon, or 5.9 GHz PHY capability.",
+      ProtocolDef::Detector::Dsrc },
     { "Cellular-V2X",
       "Cellular V2X (LTE / 5G) - replacing DSRC in many regions. "
       "Cooperative driving, traffic coordination, safety messaging. "
-      "Relevant if you extend CARLA into multi-agent or smart-city "
-      "simulations. Requires plugged-in hardware (C-V2X modem / "
-      "cellular module) to show status.",
-      ProtocolDef::Detector::None },
+      "Detected via ModemManager, C-V2X modem devices (cdc-wdm*, "
+      "qcqmi*), or cv2x_daemon process.",
+      ProtocolDef::Detector::CellularV2x },
     { "XCP",
       "Universal Measurement and Calibration Protocol - ECU tuning and "
-      "calibration. Works over CAN, Ethernet. Important in HIL/SIL "
-      "setups tied to CARLA. (UDS - Unified Diagnostic Services - also "
-      "lives over CAN/Ethernet for flashing and fault codes.)",
-      ProtocolDef::Detector::None },
+      "calibration. Works over CAN, Ethernet (port 27015). Important in "
+      "HIL/SIL setups tied to CARLA. Detected via XCP-on-Ethernet "
+      "listener, xcpd/xcp_server process, or active CAN interface.",
+      ProtocolDef::Detector::Xcp },
     { "CAN",
       "Controller Area Network - the canonical in-vehicle bus (~1 Mbps "
       "classic, up to 8 Mbps for CAN FD). Carries body/powertrain/ADAS "
@@ -7449,6 +7492,369 @@ int main(int argc, char *argv[]) {
   QObject::connect(tsnStatusTimer, &QTimer::timeout, &window, [&]() { refreshTsnState(); });
   tsnStatusTimer->start(10000);
   refreshTsnState();
+
+  // ── LIN ──────────────────────────────────────────────────────────────────
+  auto setLinIndicatorColor = [&](const QString &hex, bool blink = false) {
+    if (auto *w = findDotForDetector(ProtocolDef::Detector::Lin)) {
+      w->solidColor = hex; w->blinkActive = blink;
+      w->dot->setStyleSheet(dotStyle(hex));
+    }
+  };
+  auto refreshLinState = [&]() {
+    QProcess p;
+    p.start("/bin/bash", QStringList() << "-lc"
+      // sllin = Linux LIN-over-serial driver; lin* network interfaces;
+      // PEAK plin devices; LIN daemon processes.
+      << "if lsmod 2>/dev/null | grep -qi 'sllin'; then "
+           "iface=$(ls /sys/class/net 2>/dev/null | grep -E '^lin[0-9]+' | head -1); "
+           "if [ -n \"$iface\" ]; then "
+             "rx=$(cat /sys/class/net/$iface/statistics/rx_packets 2>/dev/null || echo 0); "
+             "tx=$(cat /sys/class/net/$iface/statistics/tx_packets 2>/dev/null || echo 0); "
+             "if [ \"$rx\" -gt 0 ] || [ \"$tx\" -gt 0 ]; then echo \"active $iface $rx $tx\"; "
+             "else echo configured; fi; "
+           "else echo sllin; fi; "
+         "elif ls /dev/plin* 2>/dev/null | head -1 | grep -q plin; then echo hardware; "
+         "elif pgrep -f '(lin_daemon|lind|linnodemon)' >/dev/null 2>&1; then echo daemon; "
+         "elif lsusb 2>/dev/null | grep -qiE '0374:001[23]'; then echo hardware; "
+         "else echo missing; fi");
+    p.waitForFinished(1000);
+    const QString state = QString::fromLocal8Bit(p.readAllStandardOutput()).trimmed();
+    ProtocolWidget *w = findDotForDetector(ProtocolDef::Detector::Lin);
+    if (!w) return;
+    if (state.startsWith("active")) {
+      const QStringList f = state.split(' ', Qt::SkipEmptyParts);
+      setLinIndicatorColor("#2E7D32", true);
+      w->dot->setToolTip(QString("LIN active on %1 (rx=%2 tx=%3)")
+        .arg(f.size() > 1 ? f[1] : "lin0")
+        .arg(f.size() > 2 ? f[2] : "?")
+        .arg(f.size() > 3 ? f[3] : "?"));
+    } else if (state == "configured" || state == "sllin") {
+      setLinIndicatorColor("#FDD835");
+      w->dot->setToolTip("sllin module loaded, no LIN traffic detected");
+    } else if (state == "hardware" || state == "daemon") {
+      setLinIndicatorColor("#FDD835");
+      w->dot->setToolTip("LIN hardware/daemon present, interface not active");
+    } else {
+      setLinIndicatorColor("#7A869A");
+      w->dot->setToolTip("LIN not detected (no sllin, no plin device, no daemon)");
+    }
+  };
+
+  // ── FlexRay ───────────────────────────────────────────────────────────────
+  auto setFlexRayIndicatorColor = [&](const QString &hex, bool blink = false) {
+    if (auto *w = findDotForDetector(ProtocolDef::Detector::FlexRay)) {
+      w->solidColor = hex; w->blinkActive = blink;
+      w->dot->setStyleSheet(dotStyle(hex));
+    }
+  };
+  auto refreshFlexRayState = [&]() {
+    QProcess p;
+    p.start("/bin/bash", QStringList() << "-lc"
+      // PEAK pcan_flexray or generic flexray kernel module;
+      // Vector CANalyzer/CANoe host process; /dev/flex* char devices.
+      << "if lsmod 2>/dev/null | grep -qiE 'pcan_flexray|flexray'; then "
+           "if ls /dev/flex* /dev/fr* 2>/dev/null | head -1 | grep -q .; then echo active; "
+           "else echo module; fi; "
+         "elif pgrep -f '(CANalyzer|CANoe|vcanserver|vxlapi|canlib)' >/dev/null 2>&1; then echo vector; "
+         "elif ls /dev/flex* /dev/fr* 2>/dev/null | head -1 | grep -q .; then echo hardware; "
+         "elif lsusb 2>/dev/null | grep -qiE '0C72:000[CD]|0374:001A'; then echo hardware; "
+         "else echo missing; fi");
+    p.waitForFinished(1000);
+    const QString state = QString::fromLocal8Bit(p.readAllStandardOutput()).trimmed();
+    ProtocolWidget *w = findDotForDetector(ProtocolDef::Detector::FlexRay);
+    if (!w) return;
+    if (state == "active") {
+      setFlexRayIndicatorColor("#2E7D32", true);
+      w->dot->setToolTip("FlexRay module loaded with active device");
+    } else if (state == "module" || state == "vector") {
+      setFlexRayIndicatorColor("#FDD835");
+      w->dot->setToolTip("FlexRay driver/process detected, no active channel");
+    } else if (state == "hardware") {
+      setFlexRayIndicatorColor("#FDD835");
+      w->dot->setToolTip("FlexRay hardware present, driver not loaded");
+    } else {
+      setFlexRayIndicatorColor("#7A869A");
+      w->dot->setToolTip("FlexRay not detected on this host");
+    }
+  };
+
+  // ── MOST ─────────────────────────────────────────────────────────────────
+  auto setMostIndicatorColor = [&](const QString &hex, bool blink = false) {
+    if (auto *w = findDotForDetector(ProtocolDef::Detector::Most)) {
+      w->solidColor = hex; w->blinkActive = blink;
+      w->dot->setStyleSheet(dotStyle(hex));
+    }
+  };
+  auto refreshMostState = [&]() {
+    QProcess p;
+    p.start("/bin/bash", QStringList() << "-lc"
+      // mostd / inic_daemon (Microchip INIC); /dev/most* char devices;
+      // Microchip USB INIC VID 0424 / SMSC.
+      << "if pgrep -f '(mostd|inic_daemon|mostcore|aim_most)' >/dev/null 2>&1; then "
+           "if ls /dev/most* 2>/dev/null | head -1 | grep -q .; then echo active; "
+           "else echo daemon; fi; "
+         "elif ls /dev/most* 2>/dev/null | head -1 | grep -q .; then echo device; "
+         "elif lsusb 2>/dev/null | grep -qiE '0424:[89][0-9A-F]{2}|2D2D:'; then echo hardware; "
+         "elif lsmod 2>/dev/null | grep -qiE 'aim_most|mostcore'; then echo module; "
+         "else echo missing; fi");
+    p.waitForFinished(1000);
+    const QString state = QString::fromLocal8Bit(p.readAllStandardOutput()).trimmed();
+    ProtocolWidget *w = findDotForDetector(ProtocolDef::Detector::Most);
+    if (!w) return;
+    if (state == "active") {
+      setMostIndicatorColor("#2E7D32", true);
+      w->dot->setToolTip("MOST daemon running with active INIC device");
+    } else if (state == "daemon" || state == "device" || state == "module") {
+      setMostIndicatorColor("#FDD835");
+      w->dot->setToolTip("MOST driver/device present but not fully active");
+    } else if (state == "hardware") {
+      setMostIndicatorColor("#FDD835");
+      w->dot->setToolTip("MOST USB INIC detected, driver not loaded");
+    } else {
+      setMostIndicatorColor("#7A869A");
+      w->dot->setToolTip("MOST not detected on this host");
+    }
+  };
+
+  // ── Automotive Ethernet ───────────────────────────────────────────────────
+  auto setAutomotiveEthIndicatorColor = [&](const QString &hex, bool blink = false) {
+    if (auto *w = findDotForDetector(ProtocolDef::Detector::AutomotiveEth)) {
+      w->solidColor = hex; w->blinkActive = blink;
+      w->dot->setStyleSheet(dotStyle(hex));
+    }
+  };
+  auto refreshAutomotiveEthState = [&]() {
+    QProcess p;
+    p.start("/bin/bash", QStringList() << "-lc"
+      // 100BASE-T1 / 1000BASE-T1 PHY drivers (NXP, Marvell 88Q, Broadcom BrPHY,
+      // Microchip LAN887x); Open Alliance oa_tc6 SPI-to-Ethernet adapter;
+      // AVB bridge daemons (openavb, mrpd, msrpd).
+      << "if lsmod 2>/dev/null | grep -qiE 'oa_tc6|nxp_pef|marvell_88q|bcm_gphy|lan887'; then "
+           "if pgrep -f '(openavb|avdecc|mrpd|msrpd|maapd)' >/dev/null 2>&1; then echo avb_active; "
+           "else echo phy; fi; "
+         "elif pgrep -f '(openavb|avdecc|mrpd|msrpd|maapd)' >/dev/null 2>&1; then echo avb; "
+         "elif lsusb 2>/dev/null | grep -qiE '0374:0150|0BDA:8153|0B95:1790'; then echo adapter; "
+         "elif ethtool -i $(ip -br link show 2>/dev/null | awk 'NR>1{print $1}' | head -1) 2>/dev/null "
+              "| grep -qi 'nxp\\|88q\\|broadr\\|brphy'; then echo phy; "
+         "else echo missing; fi");
+    p.waitForFinished(1200);
+    const QString state = QString::fromLocal8Bit(p.readAllStandardOutput()).trimmed();
+    ProtocolWidget *w = findDotForDetector(ProtocolDef::Detector::AutomotiveEth);
+    if (!w) return;
+    if (state == "avb_active") {
+      setAutomotiveEthIndicatorColor("#2E7D32", true);
+      w->dot->setToolTip("Automotive Ethernet PHY + AVB bridge daemons active");
+    } else if (state == "phy" || state == "avb" || state == "adapter") {
+      setAutomotiveEthIndicatorColor("#FDD835");
+      w->dot->setToolTip("Automotive Ethernet adapter/PHY present, AVB stack not active");
+    } else {
+      setAutomotiveEthIndicatorColor("#7A869A");
+      w->dot->setToolTip("Automotive Ethernet PHY not detected (need 100BASE-T1 / 1000BASE-T1 hardware)");
+    }
+  };
+
+  // ── gRPC ─────────────────────────────────────────────────────────────────
+  auto setGrpcIndicatorColor = [&](const QString &hex, bool blink = false) {
+    if (auto *w = findDotForDetector(ProtocolDef::Detector::Grpc)) {
+      w->solidColor = hex; w->blinkActive = blink;
+      w->dot->setStyleSheet(dotStyle(hex));
+    }
+  };
+  auto refreshGrpcState = [&]() {
+    QProcess p;
+    p.start("/bin/bash", QStringList() << "-lc"
+      // Active gRPC listener on standard port (50051) or common alternates;
+      // libgrpc.so installed; grpc-related bridge/relay process.
+      << "if ss -tlnp 2>/dev/null | grep -qE ':50051|:50050|:50052'; then echo active; "
+         "elif pgrep -f '(grpc_server|grpc_bridge|ros2.*grpc|carla.*grpc)' >/dev/null 2>&1; then echo running; "
+         "elif ldconfig -p 2>/dev/null | grep -qi 'libgrpc'; then echo installed; "
+         "elif command -v grpc_cli >/dev/null 2>&1; then echo installed; "
+         "else echo missing; fi");
+    p.waitForFinished(800);
+    const QString state = QString::fromLocal8Bit(p.readAllStandardOutput()).trimmed();
+    ProtocolWidget *w = findDotForDetector(ProtocolDef::Detector::Grpc);
+    if (!w) return;
+    if (state == "active") {
+      setGrpcIndicatorColor("#2E7D32", true);
+      w->dot->setToolTip("gRPC server active (listener on :50051 or nearby port)");
+    } else if (state == "running") {
+      setGrpcIndicatorColor("#FDD835");
+      w->dot->setToolTip("gRPC-enabled process running, no listener observed");
+    } else if (state == "installed") {
+      setGrpcIndicatorColor("#FDD835");
+      w->dot->setToolTip("libgrpc installed, no active gRPC server");
+    } else {
+      setGrpcIndicatorColor("#7A869A");
+      w->dot->setToolTip("gRPC runtime not detected on this host");
+    }
+  };
+
+  // ── DSRC (802.11p / WAVE) ─────────────────────────────────────────────────
+  auto setDsrcIndicatorColor = [&](const QString &hex, bool blink = false) {
+    if (auto *w = findDotForDetector(ProtocolDef::Detector::Dsrc)) {
+      w->solidColor = hex; w->blinkActive = blink;
+      w->dot->setStyleSheet(dotStyle(hex));
+    }
+  };
+  auto refreshDsrcState = [&]() {
+    QProcess p;
+    p.start("/bin/bash", QStringList() << "-lc"
+      // OCB (Outside Context of BSS) = 802.11p/WAVE mode in iw;
+      // waved / wsmd / wsmpd = WAVE stack daemons;
+      // 5.9 GHz PHY capability.
+      << "if iw dev 2>/dev/null | grep -qi 'type ocb'; then "
+           "iface=$(iw dev 2>/dev/null | grep -B1 'type ocb' | grep Interface | awk '{print $2}'); "
+           "echo \"active${iface:+ $iface}\"; "
+         "elif pgrep -f '(waved|wsmd|wsmpd|v2x_daemon|dsrc_daemon)' >/dev/null 2>&1; then echo daemon; "
+         "elif iw phy 2>/dev/null | grep -qi 'outside context\\|802\\.11p'; then echo capable; "
+         "elif iw list 2>/dev/null | grep -qi 'outside context\\|OCB'; then echo capable; "
+         "else echo missing; fi");
+    p.waitForFinished(1200);
+    const QString state = QString::fromLocal8Bit(p.readAllStandardOutput()).trimmed();
+    ProtocolWidget *w = findDotForDetector(ProtocolDef::Detector::Dsrc);
+    if (!w) return;
+    if (state.startsWith("active")) {
+      const QString iface = state.section(' ', 1);
+      setDsrcIndicatorColor("#2E7D32", true);
+      w->dot->setToolTip(QString("DSRC/WAVE active%1 (802.11p OCB mode)")
+        .arg(iface.isEmpty() ? QString() : " on " + iface));
+    } else if (state == "daemon") {
+      setDsrcIndicatorColor("#FDD835");
+      w->dot->setToolTip("WAVE stack daemon running, no OCB interface active");
+    } else if (state == "capable") {
+      setDsrcIndicatorColor("#FDD835");
+      w->dot->setToolTip("802.11p/WAVE-capable PHY present, not in OCB mode");
+    } else {
+      setDsrcIndicatorColor("#7A869A");
+      w->dot->setToolTip("DSRC/802.11p not detected on this host");
+    }
+  };
+
+  // ── Cellular-V2X ─────────────────────────────────────────────────────────
+  auto setCellularV2xIndicatorColor = [&](const QString &hex, bool blink = false) {
+    if (auto *w = findDotForDetector(ProtocolDef::Detector::CellularV2x)) {
+      w->solidColor = hex; w->blinkActive = blink;
+      w->dot->setStyleSheet(dotStyle(hex));
+    }
+  };
+  auto refreshCellularV2xState = [&]() {
+    QProcess p;
+    p.start("/bin/bash", QStringList() << "-lc"
+      // C-V2X modem (Qualcomm-based cdc-wdm*/qcqmi*, Sierra wdm*);
+      // cv2x_daemon or vehiclecomm process;
+      // ModemManager with modem present.
+      << "if pgrep -f '(cv2x_daemon|c.v2x|vehiclecomm|v2xcast)' >/dev/null 2>&1; then echo daemon; "
+         "elif ls /dev/cdc-wdm* /dev/qcqmi* 2>/dev/null | head -1 | grep -q .; then "
+           "if pgrep -f 'ModemManager' >/dev/null 2>&1; then echo modem_managed; "
+           "else echo modem_raw; fi; "
+         "elif pgrep -f 'ModemManager' >/dev/null 2>&1 && "
+              "mmcli -L 2>/dev/null | grep -q 'Modem'; then echo modem; "
+         "elif ls /dev/wwan* /dev/ttyUSB* 2>/dev/null | head -1 | grep -q .; then echo hardware; "
+         "else echo missing; fi");
+    p.waitForFinished(1500);
+    const QString state = QString::fromLocal8Bit(p.readAllStandardOutput()).trimmed();
+    ProtocolWidget *w = findDotForDetector(ProtocolDef::Detector::CellularV2x);
+    if (!w) return;
+    if (state == "daemon") {
+      setCellularV2xIndicatorColor("#2E7D32", true);
+      w->dot->setToolTip("C-V2X daemon active (cv2x_daemon / vehiclecomm)");
+    } else if (state == "modem_managed") {
+      setCellularV2xIndicatorColor("#FDD835");
+      w->dot->setToolTip("C-V2X modem present, managed by ModemManager");
+    } else if (state == "modem_raw" || state == "modem") {
+      setCellularV2xIndicatorColor("#FDD835");
+      w->dot->setToolTip("Cellular modem present, C-V2X stack not started");
+    } else if (state == "hardware") {
+      setCellularV2xIndicatorColor("#FDD835");
+      w->dot->setToolTip("Cellular hardware detected, no modem manager running");
+    } else {
+      setCellularV2xIndicatorColor("#7A869A");
+      w->dot->setToolTip("Cellular-V2X not detected on this host");
+    }
+  };
+
+  // ── XCP ──────────────────────────────────────────────────────────────────
+  auto setXcpIndicatorColor = [&](const QString &hex, bool blink = false) {
+    if (auto *w = findDotForDetector(ProtocolDef::Detector::Xcp)) {
+      w->solidColor = hex; w->blinkActive = blink;
+      w->dot->setStyleSheet(dotStyle(hex));
+    }
+  };
+  auto refreshXcpState = [&]() {
+    QProcess p;
+    p.start("/bin/bash", QStringList() << "-lc"
+      // XCP-on-Ethernet: default port 27015 (Vector) or 5555 (some ECU sims);
+      // xcpd / xcp_server / ccp_server process;
+      // XCP-on-CAN: presence of a CAN interface is sufficient.
+      << "if ss -tunlp 2>/dev/null | grep -qE ':27015|:5555'; then echo eth_active; "
+         "elif pgrep -f '(xcpd|xcp_server|xcp_master|ccp_server|ecumaster)' >/dev/null 2>&1; then echo daemon; "
+         "elif ls /sys/class/net 2>/dev/null | grep -qE '^(can|vcan)[0-9]+'; then echo can; "
+         "else echo missing; fi");
+    p.waitForFinished(800);
+    const QString state = QString::fromLocal8Bit(p.readAllStandardOutput()).trimmed();
+    ProtocolWidget *w = findDotForDetector(ProtocolDef::Detector::Xcp);
+    if (!w) return;
+    if (state == "eth_active") {
+      setXcpIndicatorColor("#2E7D32", true);
+      w->dot->setToolTip("XCP-on-Ethernet active (listener on :27015 or :5555)");
+    } else if (state == "daemon") {
+      setXcpIndicatorColor("#FDD835");
+      w->dot->setToolTip("XCP server/master process running");
+    } else if (state == "can") {
+      setXcpIndicatorColor("#FDD835");
+      w->dot->setToolTip("CAN interface present — XCP-on-CAN capable");
+    } else {
+      setXcpIndicatorColor("#7A869A");
+      w->dot->setToolTip("XCP not detected (no XCP-Eth listener, no daemon, no CAN)");
+    }
+  };
+
+  // ── Wire timers for new protocol detectors ────────────────────────────────
+  // Hardware-only protocols poll at 15 s (slow to change).
+  QTimer *linTimer = new QTimer(&window);
+  QObject::connect(linTimer, &QTimer::timeout, &window, [&]() { refreshLinState(); });
+  linTimer->start(15000);
+  refreshLinState();
+
+  QTimer *flexRayTimer = new QTimer(&window);
+  QObject::connect(flexRayTimer, &QTimer::timeout, &window, [&]() { refreshFlexRayState(); });
+  flexRayTimer->start(15000);
+  refreshFlexRayState();
+
+  QTimer *mostTimer = new QTimer(&window);
+  QObject::connect(mostTimer, &QTimer::timeout, &window, [&]() { refreshMostState(); });
+  mostTimer->start(15000);
+  refreshMostState();
+
+  QTimer *automotiveEthTimer = new QTimer(&window);
+  QObject::connect(automotiveEthTimer, &QTimer::timeout, &window,
+                   [&]() { refreshAutomotiveEthState(); });
+  automotiveEthTimer->start(10000);
+  refreshAutomotiveEthState();
+
+  // Software-detectable protocols poll at 5 s.
+  QTimer *grpcTimer = new QTimer(&window);
+  QObject::connect(grpcTimer, &QTimer::timeout, &window, [&]() { refreshGrpcState(); });
+  grpcTimer->start(5000);
+  refreshGrpcState();
+
+  // V2X protocols (DSRC, C-V2X) poll at 15 s.
+  QTimer *dsrcTimer = new QTimer(&window);
+  QObject::connect(dsrcTimer, &QTimer::timeout, &window, [&]() { refreshDsrcState(); });
+  dsrcTimer->start(15000);
+  refreshDsrcState();
+
+  QTimer *cellularV2xTimer = new QTimer(&window);
+  QObject::connect(cellularV2xTimer, &QTimer::timeout, &window,
+                   [&]() { refreshCellularV2xState(); });
+  cellularV2xTimer->start(15000);
+  refreshCellularV2xState();
+
+  // XCP can change when a CAN/Eth session starts — poll at 5 s.
+  QTimer *xcpTimer = new QTimer(&window);
+  QObject::connect(xcpTimer, &QTimer::timeout, &window, [&]() { refreshXcpState(); });
+  xcpTimer->start(5000);
+  refreshXcpState();
 
   QTimer *protocolBlinkTimer = new QTimer(&window);
   QObject::connect(protocolBlinkTimer, &QTimer::timeout, &window,
@@ -7864,7 +8270,6 @@ int main(int argc, char *argv[]) {
       "the AI driver owns every manoeuvre."},
   }};
 
-
   auto makeLaneKeepPixmap = []() -> QPixmap {
     const int sz = 18;
     QPixmap pm(sz, sz);
@@ -7900,8 +8305,6 @@ int main(int argc, char *argv[]) {
     p.drawEllipse(cx, 1.4, 1.4);
     return pm;
   };
-
-
 
   QSettings actuateSelfDriveSettings;
   bool l1FeatureIsLaneKeep =
@@ -7942,10 +8345,6 @@ int main(int argc, char *argv[]) {
 
     rowLay->addWidget(leftIcon, 0, Qt::AlignVCenter);
 
-
-
-
-
     if (i == 1) {
       l1LaneKeepBtn = new QPushButton();
       l1AccBtn      = new QPushButton();
@@ -7984,8 +8383,6 @@ int main(int argc, char *argv[]) {
     const int clamped = (saved < 0 || saved >= static_cast<int>(saeButtons.size())) ? 0 : saved;
     saeButtons[static_cast<size_t>(clamped)]->setChecked(true);
   }
-
-
 
   auto applyL5InputLockout = [actuatePlayers](int level) {
     if (actuatePlayers->empty()) return;
@@ -8051,11 +8448,7 @@ int main(int argc, char *argv[]) {
     }
   });
 
-
-
   applyL5InputLockout(saeBtnGroup->checkedId());
-
-
 
   if (l1LaneKeepBtn && l1AccBtn) {
     auto onL1FeaturePicked = [&, l1LaneKeepBtn, l1AccBtn]() {
@@ -9271,7 +9664,7 @@ int main(int argc, char *argv[]) {
   wireCategory("NAV", navChecks, navGears, navPluses, navSensorCountLabels, navSensorCounts, navCountLabel);
   wireCategory("GT", gtChecks, gtGears, gtPluses, gtSensorCountLabels, gtSensorCounts, gtCountLabel);
 
-  QDockWidget *previewDock = new QDockWidget("Sensor Preview Group", &window);
+  previewDock = new QDockWidget("Sensor Preview Group", &window);
   previewDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea | Qt::BottomDockWidgetArea);
   previewDock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetClosable);
   QWidget *previewDockContent = new QWidget();
@@ -9301,7 +9694,6 @@ int main(int argc, char *argv[]) {
   previewDock->setWidget(previewDockContent);
   window.addDockWidget(Qt::RightDockWidgetArea, previewDock);
   previewDock->hide();
-
 
   {
     QDockWidget *vd = new QDockWidget("Camera Views", &window);
@@ -9868,7 +10260,7 @@ int main(int argc, char *argv[]) {
     return tile;
   };
 
-  auto addPreviewTileByName = [&](const QString &sensor_name) {
+  addPreviewTileByName = [&](const QString &sensor_name) {
     if (previewTiles.contains(sensor_name)) return;
     QGroupBox *tile = createPreviewTile(sensor_name);
     previewTiles.insert(sensor_name, tile);
@@ -12087,6 +12479,7 @@ int main(int argc, char *argv[]) {
   docsLink->setStyleSheet("font-size: 10px;");
   docsLink->setMinimumWidth(28);
   docsLink->setToolTip("Content authoring guide - supported formats and conversion tips.");
+  docsLink->setVisible(false);
 
   QWidget *cornerBox = new QWidget();
   QVBoxLayout *cornerLayout = new QVBoxLayout(cornerBox);
@@ -12654,17 +13047,7 @@ int main(int argc, char *argv[]) {
   toggleHealthCheckAction->setCheckable(true);
   toggleHealthCheckAction->setChecked(false);
 
-
-
-
-
-
-
-
   helpMenu->setToolTipsVisible(true);
-
-
-
 
   struct SysInfo {
     QString distro, kernel, host, user, cpu, gpu, ram;
@@ -12699,7 +13082,6 @@ int main(int argc, char *argv[]) {
     s.host   = QSysInfo::machineHostName();
     s.user   = QString::fromLocal8Bit(qgetenv("USER"));
 
-
     const QString cpu_model = carla_studio_proc::cpu_model_string();
     QString clockGhz;
     const double ghz = carla_studio_proc::cpu_clock_ghz();
@@ -12714,7 +13096,6 @@ int main(int argc, char *argv[]) {
                               : s.cpu + " (" + tags.join(", ") + ")";
     }
     if (s.cpu.isEmpty()) s.cpu = "n/a";
-
 
 #if defined(Q_OS_MAC) || defined(__APPLE__)
     s.gpu = run_cmd(
@@ -12792,8 +13173,6 @@ int main(int argc, char *argv[]) {
       QLabel *title = new QLabel("<h2 style='margin:0'>System Info</h2>");
       title->setTextFormat(Qt::RichText);
       outer->addWidget(title);
-
-
 
       auto *frame = new QFrame();
       frame->setFrameShape(QFrame::StyledPanel);

@@ -87,7 +87,6 @@ void ViewGizmo::redraw()
   const int cy = H / 2;
   const int R  = 43;
 
-
   QRadialGradient bg(cx - 10, cy - 10, R * 1.3f);
   bg.setColorAt(0, QColor(72, 74, 86));
   bg.setColorAt(1, QColor(22, 23, 28));
@@ -95,16 +94,13 @@ void ViewGizmo::redraw()
   p.setBrush(bg);
   p.drawEllipse(QPoint(cx, cy), R, R);
 
-
   p.setPen(QColor(100, 100, 120, 100));
   p.setBrush(Qt::NoBrush);
   p.drawEllipse(QPoint(cx, cy), R, R);
 
-
   p.setPen(QColor(80, 80, 100, 55));
   p.drawLine(cx - R, cy, cx + R, cy);
   p.drawLine(cx, cy - R, cx, cy + R);
-
 
   std::array<int, 6> order = {0, 1, 2, 3, 4, 5};
   std::sort(order.begin(), order.end(), [this](int a, int b) {
