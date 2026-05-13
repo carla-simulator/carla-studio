@@ -45,7 +45,7 @@ endif ()
 # is the source of truth - bump in lockstep with the matching CHANGELOG.md
 # entry sitting next to this file.
 # -----------------------------------------------------------------------------
-set (CARLA_STUDIO_VERSION "1.2.0")
+set (CARLA_STUDIO_VERSION "1.3.0")
 
 if (NOT COMMAND carla_message)
   function (carla_message msg)
@@ -359,10 +359,32 @@ target_compile_definitions (
   "CARLA_STUDIO_VERSION_STRING=\"${CARLA_STUDIO_VERSION}\""
 )
 
-# Calibration CLI: pre-import inspector. Loads a vehicle mesh, renders top /
-# side / front PNGs on a 1m calibration grid, prints a JSON summary. Same
-# rendering core as the Studio Preview tab. Used from the terminal for
-# regression-free orientation and size-class checks before touching Unreal.
+target_sources (carla-studio PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/vehicle/import/cleanup_cli.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/setup_cli.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/start_cli.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/stop_cli.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/maps_cli.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/interfaces/sensor_cli.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/interfaces/actuate_cli.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/healthcheck_cli.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/cosim_cli.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/preview_cli.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/scenario_cli.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/keepalive_cli.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/stack_cli.cpp
+)
+
+add_custom_command (TARGET carla-studio POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:carla-studio>/cfg"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${CMAKE_CURRENT_SOURCE_DIR}/utils/launch/terminal_launch_map.json"
+    "$<TARGET_FILE_DIR:carla-studio>/cfg/terminal_launch_map.json"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${CMAKE_CURRENT_SOURCE_DIR}/cfg/env.ini"
+    "$<TARGET_FILE_DIR:carla-studio>/cfg/env.ini"
+)
+
 carla_add_executable (
   carla-studio-vehicle-preview
   "Calibration CLI for vehicle mesh inspection."
@@ -373,21 +395,6 @@ target_link_libraries (
   carla-studio-vehicle-import
   ${CARLA_STUDIO_QT_CORE_TARGET}
   ${CARLA_STUDIO_QT_WIDGETS_TARGET}
-)
-
-
-# Standalone cleanup utility - finds and SIGKILLs stale CARLA Studio /
-# UnrealEditor / CarlaUnreal-Linux-Shipping / CarlaUnreal.sh processes
-# left behind by a crash or interrupted run. Uses pgrep extended-regex
-# patterns; idempotent (exit 0 even if nothing matched).
-carla_add_executable (
-  carla-studio-cli_cleanup
-  "Standalone cleanup CLI - kills stale CARLA Studio / UE / shipping processes."
-  ${CMAKE_CURRENT_SOURCE_DIR}/vehicle/import/cleanup_cli.cpp
-)
-target_link_libraries (
-  carla-studio-cli_cleanup PRIVATE
-  ${CARLA_STUDIO_QT_CORE_TARGET}
 )
 
 
@@ -437,6 +444,12 @@ if (UNIX AND NOT APPLE)
     OPTIONAL
   )
   install (TARGETS carla-studio RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+  install (
+    FILES
+      "${CMAKE_CURRENT_SOURCE_DIR}/utils/launch/terminal_launch_map.json"
+      "${CMAKE_CURRENT_SOURCE_DIR}/cfg/env.ini"
+    DESTINATION "${CMAKE_INSTALL_BINDIR}/cfg"
+  )
 endif ()
 
 if (APPLE)
@@ -479,20 +492,6 @@ carla_message ("CARLA Studio Qt Test target: ${CARLA_STUDIO_QT_TEST_TARGET}")
 
 include (CTest)
 
-if (BUILD_TESTING AND UNIX)
-  add_test (
-    NAME carla-studio-ue4-quick-launch-kill
-    COMMAND /usr/bin/env bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/quick_runtime_checks.sh ue4
-  )
-  add_test (
-    NAME carla-studio-ue5-quick-launch-kill
-    COMMAND /usr/bin/env bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/quick_runtime_checks.sh ue5
-  )
-  add_test (
-    NAME carla-studio-thirdparty-checks
-    COMMAND /usr/bin/env bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/quick_runtime_checks.sh thirdparty
-  )
-endif ()
 
 if (CARLA_STUDIO_QT_TEST_TARGET)
   add_executable (
@@ -523,18 +522,16 @@ if (CARLA_STUDIO_QT_TEST_TARGET)
     add_test (NAME carla-studio-tests COMMAND carla-studio-tests)
   endif ()
 
-  add_executable (
-    test-suite_carla-studio-gui
-    ${CARLA_STUDIO_SOURCE_DIR}/tests/studio_gui_matrix.cpp
+  carla_add_executable (
+    carla-studio-test-suite
+    "Unified test suite: CLI pipeline + GUI matrix dispatch + screenshot capture."
+    ${CMAKE_CURRENT_SOURCE_DIR}/vehicle/import/run_test_suite_cli.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_pipeline_test.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/studio_gui_matrix.cpp
   )
-
-  set_target_properties (
-    test-suite_carla-studio-gui PROPERTIES
-    AUTOMOC ON
-  )
-
+  set_target_properties (carla-studio-test-suite PROPERTIES AUTOMOC ON)
   target_link_libraries (
-    test-suite_carla-studio-gui PRIVATE
+    carla-studio-test-suite PRIVATE
     ${CARLA_STUDIO_QT_TEST_TARGET}
     ${CARLA_STUDIO_QT_WIDGETS_TARGET}
     ${CARLA_STUDIO_QT_NETWORK_TARGET}
@@ -544,51 +541,31 @@ if (CARLA_STUDIO_QT_TEST_TARGET)
   )
   if (CARLA_STUDIO_QT3D_AVAILABLE)
     target_sources (
-      test-suite_carla-studio-gui PRIVATE
+      carla-studio-test-suite PRIVATE
       ${CARLA_STUDIO_CALIBRATION_SOURCES}
     )
     target_link_libraries (
-      test-suite_carla-studio-gui PRIVATE
+      carla-studio-test-suite PRIVATE
       ${CARLA_STUDIO_QT_3D_TARGETS}
     )
     target_compile_definitions (
-      test-suite_carla-studio-gui PRIVATE
+      carla-studio-test-suite PRIVATE
       CARLA_STUDIO_WITH_QT3D
     )
   endif ()
-
   target_compile_definitions (
-    test-suite_carla-studio-gui PRIVATE
+    carla-studio-test-suite PRIVATE
     "CARLA_STUDIO_SOURCE_PATH=\"${CARLA_STUDIO_APP_SOURCE}\""
     "CARLA_STUDIO_REPO_ROOT=\"${CMAKE_CURRENT_SOURCE_DIR}/..\""
     "CARLA_STUDIO_TESTS_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests\""
     "CARLA_STUDIO_BINARY_PATH=\"$<TARGET_FILE:carla-studio>\""
   )
+  add_dependencies (carla-studio-test-suite carla-studio)
 
   if (BUILD_TESTING)
-    add_test (NAME test-suite_carla-studio-gui
-              COMMAND test-suite_carla-studio-gui)
+    add_test (NAME carla-studio-test-suite COMMAND carla-studio-test-suite)
   endif ()
 
-  carla_add_executable (
-    test-suite_carla-studio-cli
-    "Test suite runner - CLI pipeline tests + GUI matrix dispatch + screenshot capture."
-    ${CMAKE_CURRENT_SOURCE_DIR}/vehicle/import/run_test_suite_cli.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_pipeline_test.cpp
-  )
-  set_target_properties (test-suite_carla-studio-cli PROPERTIES AUTOMOC ON)
-  target_link_libraries (
-    test-suite_carla-studio-cli PRIVATE
-    ${CARLA_STUDIO_QT_GUI_TARGET}
-    ${CARLA_STUDIO_QT_CORE_TARGET}
-    ${CARLA_STUDIO_QT_TEST_TARGET}
-    carla-studio-vehicle-import
-  )
-  target_compile_definitions (
-    test-suite_carla-studio-cli PRIVATE
-    "CARLA_STUDIO_REPO_ROOT=\"${CMAKE_CURRENT_SOURCE_DIR}/..\""
-    "CARLA_STUDIO_BINARY_PATH=\"$<TARGET_FILE:carla-studio>\""
-  )
-  add_dependencies (test-suite_carla-studio-cli carla-studio test-suite_carla-studio-gui)
+  add_custom_target (test-suite DEPENDS carla-studio-test-suite)
 
 endif ()

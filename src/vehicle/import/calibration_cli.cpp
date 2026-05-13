@@ -49,8 +49,6 @@ int main(int argc, char **argv)
   QString out_dir = QString("/tmp/vehicle_preview/") + baseName;
   float scaleOverride = 1.0f;
 
-
-
   QVector3D wheelFL, wheelFR, wheelRL, wheelRR;
   bool gotWheels = false;
   auto parseV3 = [](const QString &s, QVector3D &out) {
@@ -145,9 +143,9 @@ int main(int argc, char **argv)
   js << "  \"extents_cm\": ["   << sum.ext_cm[0] << ", "
                                 << sum.ext_cm[1] << ", "
                                 << sum.ext_cm[2] << "],\n";
-  js << "  \"extents_m\": ["    << sum.ext_cm[0]/100.0 << ", "
-                                << sum.ext_cm[1]/100.0 << ", "
-                                << sum.ext_cm[2]/100.0 << "],\n";
+  js << "  \"extents_m\": ["    << double(sum.ext_cm[0])/100.0 << ", "
+                                << double(sum.ext_cm[1])/100.0 << ", "
+                                << double(sum.ext_cm[2])/100.0 << "],\n";
   js << "  \"volume_m3\": "     << sum.volume_m3 << ",\n";
   js << "  \"size_class\": \""  << sum.size_class << "\",\n";
   js << "  \"forward_axis\": \"" << fwdAxisName << "\",\n";

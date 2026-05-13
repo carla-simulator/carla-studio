@@ -312,7 +312,6 @@ VehicleImportPage::VehicleImportPage(EditorBinaryResolver find_editor,
     "  • Wait for the VehicleImporter port to come up.\n"
     "  • Send the spec, import the mesh, build wheel + vehicle BPs.");
 
-
   m_drop_btn = new QPushButton("Drive");
   m_drop_btn->setEnabled(false);
   m_drop_btn->setMinimumWidth(110);
@@ -989,7 +988,6 @@ void VehicleImportPage::on_import() {
   }
   if (m_vehicle_name_edit->text().trimmed() != name)
     m_vehicle_name_edit->setText(name);
-
 
   QString meshToSend = mesh_path;
   const QString tires_path = m_wheels_path_edit ? m_wheels_path_edit->text().trimmed() : QString();

@@ -18,8 +18,6 @@
 
 namespace carla_studio::vehicle_import {
 
-
-
 struct ImportPipelineKnobs {
   float mass             = 1500.f;
   float max_steer_angle    = 70.f;
@@ -64,14 +62,6 @@ struct ImportPipelineResult {
   QString error_detail;
 };
 
-
-
-
-
-
-
-
-
 struct ImportPipelineCallbacks {
   std::function<void(const QString &)>            log;
   std::function<bool(const QString &question)>    ask_yes_no;
@@ -80,25 +70,11 @@ struct ImportPipelineCallbacks {
   std::function<bool()>                           confirm_start_import;
 };
 
-
-
-
 ImportPipelineResult run_import_pipeline(const ImportPipelineInput &in,
                                        const ImportPipelineCallbacks &cb);
 
-
-
-
-
-
-
-
-
 void open_calibration_window(const QString &mesh_path,
                            class QWidget *parent = nullptr);
-
-
-
 
 void open_calibration_window_with_wheels(const QString &mesh_path,
                                      const std::array<float, 12> &wheels_cm_xyz,

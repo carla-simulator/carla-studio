@@ -175,10 +175,6 @@ void makeStencilRect(Qt3DCore::QEntity *parent,
   makeRodXY(parent, fr, rr, radius, color);
 }
 
-
-
-
-
 Qt3DCore::QEntity *makeTextLabelOnGround(Qt3DCore::QEntity *parent,
                                          const QString &text,
                                          const QVector3D &posCm,
@@ -198,7 +194,6 @@ Qt3DCore::QEntity *makeTextLabelOnGround(Qt3DCore::QEntity *parent,
   mat->setSpecular(QColor(255, 255, 255));
   mat->setShininess(8.f);
   auto *t = new Qt3DCore::QTransform();
-
 
   const float scale = heightCm / 14.f;
   t->setScale(scale);
@@ -284,7 +279,6 @@ VehiclePreviewPage::VehiclePreviewPage(QWidget *parent) : QWidget(parent)
   outer->setContentsMargins(0, 0, 0, 0);
   outer->setSpacing(0);
 
-
   auto *topBar = new QWidget(this);
   topBar->setFixedHeight(34);
   topBar->setStyleSheet("QWidget { background-color: #252525;"
@@ -307,7 +301,6 @@ VehiclePreviewPage::VehiclePreviewPage(QWidget *parent) : QWidget(parent)
   topRow->addWidget(m_browse_btn);
   topRow->addWidget(m_load_btn);
   outer->addWidget(topBar);
-
 
   auto *viewBar = new QWidget(this);
   viewBar->setFixedHeight(30);
@@ -354,7 +347,6 @@ VehiclePreviewPage::VehiclePreviewPage(QWidget *parent) : QWidget(parent)
 
   viewRow2->addStretch();
 
-
   const QString modeBase =
     "QPushButton { font-size:10px; font-weight:600; padding:0 10px; height:22px;"
     "  border:1px solid #555; background:#2E2E2E; color:#999; }"
@@ -399,16 +391,13 @@ VehiclePreviewPage::VehiclePreviewPage(QWidget *parent) : QWidget(parent)
   viewRow2->addWidget(m_apply_btn);
   outer->addWidget(viewBar);
 
-
   build_scene();
   m_container = QWidget::createWindowContainer(m_view, this);
   m_container->setMinimumSize(480, 380);
   m_container->setFocusPolicy(Qt::StrongFocus);
 
-
   m_left_stack = new QStackedWidget(this);
   m_left_stack->setFixedWidth(54);
-
 
   auto *importLeftPage = new QWidget();
   importLeftPage->setStyleSheet("QWidget { background-color: #252525;"
@@ -453,7 +442,6 @@ VehiclePreviewPage::VehiclePreviewPage(QWidget *parent) : QWidget(parent)
   importLeftLayout->addStretch();
   m_left_stack->addWidget(importLeftPage);
 
-
   auto *sensorLeftPage = new QWidget();
   sensorLeftPage->setStyleSheet("QWidget { background-color: #252525;"
                                 "  border-right: 1px solid #333; }");
@@ -483,10 +471,8 @@ VehiclePreviewPage::VehiclePreviewPage(QWidget *parent) : QWidget(parent)
   sensorLeftLayout->addStretch();
   m_left_stack->addWidget(sensorLeftPage);
 
-
   m_right_stack = new QStackedWidget(this);
   m_right_stack->setFixedWidth(210);
-
 
   auto *importRightPage = new QWidget();
   importRightPage->setStyleSheet(
@@ -494,7 +480,6 @@ VehiclePreviewPage::VehiclePreviewPage(QWidget *parent) : QWidget(parent)
   auto *importRightLayout = new QVBoxLayout(importRightPage);
   importRightLayout->setContentsMargins(0, 0, 0, 0);
   importRightLayout->setSpacing(0);
-
 
   m_view_gizmo = new ViewGizmo(importRightPage);
   m_view_gizmo->setFixedSize(110, 110);
@@ -546,7 +531,6 @@ VehiclePreviewPage::VehiclePreviewPage(QWidget *parent) : QWidget(parent)
     "<span style='color:#5082FF'>▪</span> blue - +Z up");
   importRightLayout->addWidget(m_legend, 1);
   m_right_stack->addWidget(importRightPage);
-
 
   auto *sensorRightPage = new QWidget();
   sensorRightPage->setStyleSheet(
@@ -620,7 +604,6 @@ VehiclePreviewPage::VehiclePreviewPage(QWidget *parent) : QWidget(parent)
   sensorLayout->addWidget(sensorNote);
   m_right_stack->addWidget(sensorRightPage);
 
-
   auto *mainRow = new QHBoxLayout();
   mainRow->setContentsMargins(0, 0, 0, 0);
   mainRow->setSpacing(0);
@@ -629,13 +612,11 @@ VehiclePreviewPage::VehiclePreviewPage(QWidget *parent) : QWidget(parent)
   mainRow->addWidget(m_right_stack, 0);
   outer->addLayout(mainRow, 1);
 
-
   m_calibration_badge = new QLabel(m_container);
   m_calibration_badge->setStyleSheet(
     "QLabel { background-color: rgba(10,10,10,210); color: #DDD;"
     "  padding: 5px 10px; border-radius: 3px; font-weight:700; font-size:12px; }");
   m_calibration_badge->hide();
-
 
   connect(m_view_gizmo, &ViewGizmo::snap_requested,
           this, [this](const QVector3D &pos, const QVector3D &ctr, const QVector3D &up) {
@@ -648,7 +629,6 @@ VehiclePreviewPage::VehiclePreviewPage(QWidget *parent) : QWidget(parent)
   if (m_view) m_view_gizmo->bind_camera(m_view->camera());
 
   installEventFilter(this);
-
 
   auto *statusBar = new QWidget(this);
   statusBar->setFixedHeight(22);
@@ -713,11 +693,6 @@ void VehiclePreviewPage::build_scene()
   m_mesh_transform = new Qt3DCore::QTransform();
   m_mesh_entity->addComponent(m_mesh_transform);
 
-
-
-
-
-
   m_scene_loader = new Qt3DRender::QSceneLoader(m_mesh_entity);
   m_mesh_entity->addComponent(m_scene_loader);
   connect(m_scene_loader, &Qt3DRender::QSceneLoader::statusChanged, this,
@@ -744,7 +719,6 @@ void VehiclePreviewPage::build_axis_gizmo(Qt3DCore::QEntity *root, float length_
   makeAxis(root, QVector3D(0, length_cm, 0),  QColor( 60, 200,  60));
   makeAxis(root, QVector3D(0, 0, length_cm),  QColor( 80, 130, 255));
 
-
   const float lift = 1.5f;
   const float labelH = 14.f;
   makeTextLabelOnGround(root, "+X (lat)",
@@ -770,7 +744,6 @@ void VehiclePreviewPage::build_reference_outlines(Qt3DCore::QEntity *root)
   };
   for (const Tpl &t : tpls) {
     makeStencilRect(root, t.halfW, t.halfL, zLift, 1.5f, t.color);
-
 
     makeTextLabelOnGround(root, QString::fromUtf8(t.name),
                           QVector3D(t.halfW + 5.f, -t.halfL - 12.f, zLift),
@@ -801,11 +774,6 @@ void VehiclePreviewPage::build_wheel_markers(Qt3DCore::QEntity *root)
     m_wheel_xforms[i]  = t;
     e->setObjectName(labels[i]);
 
-
-
-
-
-
     auto *stripe = new Qt3DCore::QEntity(e);
     auto *sm = new Qt3DExtras::QPlaneMesh();
     sm->setWidth(25.0f);
@@ -819,8 +787,6 @@ void VehiclePreviewPage::build_wheel_markers(Qt3DCore::QEntity *root)
     stripe->addComponent(smat);
     stripe->addComponent(st);
 
-
-
     const float dx = (i == 0 || i == 2) ? -22.f : +22.f;
     makeTextLabelOnGround(e, labels[i],
                           QVector3D(dx, 0.f, 0.5f),
@@ -830,7 +796,6 @@ void VehiclePreviewPage::build_wheel_markers(Qt3DCore::QEntity *root)
 
 void VehiclePreviewPage::build_alignment_rods(Qt3DCore::QEntity *root)
 {
-
 
   const QColor colors[10] = {
     QColor(255, 255, 255),
@@ -880,9 +845,6 @@ void VehiclePreviewPage::update_alignment_lines()
   }
   if (m_align_rods[3].mesh) updateAlignRod(m_align_rods[3].mesh, m_align_rods[3].xform, fl, rl);
   if (m_align_rods[4].mesh) updateAlignRod(m_align_rods[4].mesh, m_align_rods[4].xform, fr, rr);
-
-
-
 
   const QVector3D fwdDelta(0, 70.f, 0);
   const QVector3D wheels[4] = { fl, fr, rl, rr };
@@ -996,12 +958,6 @@ void VehiclePreviewPage::load_mesh(const QString &path)
     return;
   }
 
-
-
-
-
-
-
   const bool useSceneLoaderOnly = m_scene_loader && objHasMtllib(path);
   if (!useSceneLoaderOnly) {
     if (!installMeshGeometry(m_mesh_entity, m_mesh_transform, g)) {
@@ -1009,7 +965,6 @@ void VehiclePreviewPage::load_mesh(const QString &path)
       return;
     }
   } else {
-
 
     const auto comps = m_mesh_entity->components();
     for (auto *c : comps) {
@@ -1033,7 +988,6 @@ void VehiclePreviewPage::set_wheel_positions_cm(const QVector3D &fl,
                                              const QVector3D &rl,
                                              const QVector3D &rr)
 {
-
 
   constexpr float kGroundZ = 1.5f;
   const QVector3D gnd[4] = {
@@ -1090,8 +1044,6 @@ void VehiclePreviewPage::on_scene_status_changed(int statusInt)
       m_status_label->setText("Materials unavailable - Qt3D scene importer "
                             "plugin missing. Install qt6-3d-assimpsceneimport-plugin "
                             "(Ubuntu 24) for OBJ+MTL rendering. Falling back to flat shading.");
-
-
 
       if (!m_pending_mesh_path.isEmpty()) {
         MeshGeometry g = load_mesh_geometry(m_pending_mesh_path);
@@ -1191,8 +1143,6 @@ void VehiclePreviewPage::update_mesh_bounds()
     update_alignment_lines();
   }
 
-
-
   if (m_align_rods[5].mesh) {
     constexpr float kRodZ = 4.f;
     const float fwdY  = yIsForward ?  halfY :  halfX;
@@ -1273,7 +1223,6 @@ void VehiclePreviewPage::update_mesh_bounds()
   m_info_box->setPlainText(info);
 }
 
-
 void VehiclePreviewPage::view_top()
 {
   if (!m_view || !m_view->camera()) return;
@@ -1310,7 +1259,6 @@ void VehiclePreviewPage::fit_camera()
 {
   if (!m_path_edit->text().isEmpty()) update_mesh_bounds();
 }
-
 
 void VehiclePreviewPage::apply_adjustment(const QString &label)
 {
@@ -1392,9 +1340,6 @@ void VehiclePreviewPage::apply_to_spec()
 
 void VehiclePreviewPage::capture_window()
 {
-
-
-
 
   QWidget *target = window() ? window() : this;
   QPixmap pix = target->grab();

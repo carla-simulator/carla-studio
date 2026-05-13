@@ -1,9 +1,21 @@
 {
   "tabs": [
-    { "id": 1, "label": "CARLA Core" },
-    { "id": 2, "label": "Simulation & AI" },
-    { "id": 3, "label": "Monitoring & Viz" },
-    { "id": 4, "label": "Debug" }
+    {
+      "id": 1,
+      "label": "CARLA Core"
+    },
+    {
+      "id": 2,
+      "label": "Simulation & AI"
+    },
+    {
+      "id": 3,
+      "label": "Monitoring & Viz"
+    },
+    {
+      "id": 4,
+      "label": "Debug"
+    }
   ],
   "terminals": [
     {
@@ -12,7 +24,10 @@
       "tab": 1,
       "pane": 1,
       "post_spawn_sleep": 3,
-      "modes": { "gnome": true, "terminator": true },
+      "modes": {
+        "gnome": true,
+        "terminator": true
+      },
       "command": "cd '__CARLA_DIR__'; export DISPLAY=\"${DISPLAY:-:0}\"; echo 'CARLA Server starting on port __CARLA_PORT__ on DISPLAY='\"$DISPLAY\"; ./CarlaUE4.sh -carla-rpc-port=__CARLA_PORT__ -quality-level=Low"
     },
     {
@@ -21,7 +36,10 @@
       "tab": 1,
       "pane": 2,
       "post_spawn_sleep": 2,
-      "modes": { "gnome": true, "terminator": true },
+      "modes": {
+        "gnome": true,
+        "terminator": true
+      },
       "command": "sleep 5; echo 'Loading map: __DEFAULT_MAP_NAME__'; cd '__PARENT_DIR__/launch/examples/carla_examples'; __PYTHON_BIN__ load_mcity_map.py"
     },
     {
@@ -30,7 +48,10 @@
       "tab": 1,
       "pane": 3,
       "post_spawn_sleep": 2,
-      "modes": { "gnome": true, "terminator": true },
+      "modes": {
+        "gnome": true,
+        "terminator": true
+      },
       "command": "sleep 10; echo 'Starting Manual CAV Driver'; . /opt/ros/*/setup.bash 2>/dev/null || true; cd '__PARENT_DIR__/launch/examples/carla_examples'; export DISPLAY=\"${DISPLAY:-:0}\"; export SDL_VIDEODRIVER=\"x11\"; export SDL_AUDIODRIVER=\"dummy\"; export PYTHONPATH=\"${PYTHONPATH:-}:__PARENT_DIR__/launch/python_packages:__CARLA_DIR__/PythonAPI/carla\"; export CARLA_VEHICLE_TYPE='__CARLA_VEHICLE_TYPE__'; __PYTHON_BIN__ carla_av_ros2.py 2>&1 | tee '__PARENT_DIR__/manual_cav.log'"
     },
     {
@@ -39,7 +60,10 @@
       "tab": 1,
       "pane": 4,
       "post_spawn_sleep": 2,
-      "modes": { "gnome": true, "terminator": true },
+      "modes": {
+        "gnome": true,
+        "terminator": true
+      },
       "command": "sleep 12; echo 'Starting Sensor Publisher'; . /opt/ros/*/setup.bash 2>/dev/null || true; cd '__PARENT_DIR__/launch/examples/carla_examples'; export PYTHONPATH=\"${PYTHONPATH:-}:__PARENT_DIR__/launch/python_packages:__CARLA_DIR__/PythonAPI/carla\"; __PYTHON_BIN__ carla_sensor_ros2.py 2>&1 | tee '__PARENT_DIR__/sensor_publisher.log'"
     },
     {
@@ -48,8 +72,11 @@
       "tab": 2,
       "pane": 1,
       "post_spawn_sleep": 2,
-      "modes": { "gnome": true, "terminator": true },
-      "command": "sleep 20; echo 'Starting TeraSim Co-simulation'; . /opt/ros/*/setup.bash 2>/dev/null || true; export TERASIM_SCENARIO='__TERASIM_SCENARIO__'; bash '__PARENT_DIR__/launch/run/terminal5_cosim_runner.sh'"
+      "modes": {
+        "gnome": true,
+        "terminator": true
+      },
+      "command": "sleep 20; echo 'Starting TeraSim Co-simulation'; carla-studio cosim --directory '__PARENT_DIR__'"
     },
     {
       "id": 6,
@@ -57,7 +84,10 @@
       "tab": 2,
       "pane": 2,
       "post_spawn_sleep": 2,
-      "modes": { "gnome": true, "terminator": true },
+      "modes": {
+        "gnome": true,
+        "terminator": true
+      },
       "command": "sleep 15; echo 'Starting GNSS Decoder'; . /opt/ros/*/setup.bash 2>/dev/null || true; cd '__PARENT_DIR__/launch/examples/carla_examples'; export PYTHONPATH=\"${PYTHONPATH:-}:__PARENT_DIR__/launch/python_packages:__CARLA_DIR__/PythonAPI/carla\"; __PYTHON_BIN__ gnss_decoder_fallback.py 2>&1 | tee '__PARENT_DIR__/gnss_decoder.log'"
     },
     {
@@ -66,7 +96,10 @@
       "tab": 2,
       "pane": 3,
       "post_spawn_sleep": 2,
-      "modes": { "gnome": true, "terminator": true },
+      "modes": {
+        "gnome": true,
+        "terminator": true
+      },
       "command": "sleep 17; echo 'Starting Autoware Planning Bridge'; . /opt/ros/*/setup.bash 2>/dev/null || true; cd '__PARENT_DIR__/launch/examples/carla_examples'; export PYTHONPATH=\"${PYTHONPATH:-}:__PARENT_DIR__/launch/python_packages:__CARLA_DIR__/PythonAPI/carla\"; __PYTHON_BIN__ planning_simulator_fallback.py 2>&1 | tee '__PARENT_DIR__/autoware_launch.log'"
     },
     {
@@ -75,8 +108,11 @@
       "tab": 2,
       "pane": 4,
       "post_spawn_sleep": 2,
-      "modes": { "gnome": true, "terminator": true },
-      "command": "sleep 20; echo 'Starting Preview Control'; . /opt/ros/*/setup.bash 2>/dev/null || true; bash '__PARENT_DIR__/launch/run/terminal8_preview_runner.sh'"
+      "modes": {
+        "gnome": true,
+        "terminator": true
+      },
+      "command": "sleep 20; echo 'Starting Preview Control'; carla-studio preview --directory '__PARENT_DIR__'"
     },
     {
       "id": 9,
@@ -84,8 +120,11 @@
       "tab": 3,
       "pane": 1,
       "post_spawn_sleep": 2,
-      "modes": { "gnome": true, "terminator": true },
-      "command": "sleep 22; echo 'Starting TeraSim Scenario: __TERASIM_SCENARIO__'; . /opt/ros/*/setup.bash 2>/dev/null || true; export TERASIM_SCENARIO='__TERASIM_SCENARIO__'; bash '__PARENT_DIR__/launch/run/terminal9_scenario_runner.sh'"
+      "modes": {
+        "gnome": true,
+        "terminator": true
+      },
+      "command": "sleep 22; echo 'Starting TeraSim Scenario: __TERASIM_SCENARIO__'; carla-studio scenario --scenario '__TERASIM_SCENARIO__' --directory '__PARENT_DIR__'"
     },
     {
       "id": 10,
@@ -93,7 +132,10 @@
       "tab": 3,
       "pane": 2,
       "post_spawn_sleep": 2,
-      "modes": { "gnome": true, "terminator": true },
+      "modes": {
+        "gnome": true,
+        "terminator": true
+      },
       "command": "sleep 25; echo 'Starting RViz2'; . /opt/ros/*/setup.bash 2>/dev/null || true; rviz2 -d '__SCRIPT_DIR__/../rviz_config/carla_mcity_ros2.rviz' 2>&1 | tee '__PARENT_DIR__/rviz2.log'"
     },
     {
@@ -102,7 +144,10 @@
       "tab": 3,
       "pane": 3,
       "post_spawn_sleep": 0,
-      "modes": { "gnome": false, "terminator": true },
+      "modes": {
+        "gnome": false,
+        "terminator": true
+      },
       "command": "htop"
     },
     {
@@ -111,7 +156,10 @@
       "tab": 3,
       "pane": 4,
       "post_spawn_sleep": 0,
-      "modes": { "gnome": false, "terminator": true },
+      "modes": {
+        "gnome": false,
+        "terminator": true
+      },
       "command": "nvtop"
     },
     {
@@ -120,7 +168,10 @@
       "tab": 4,
       "pane": 1,
       "post_spawn_sleep": 0,
-      "modes": { "gnome": false, "terminator": true },
+      "modes": {
+        "gnome": false,
+        "terminator": true
+      },
       "command": "bash"
     },
     {
@@ -129,7 +180,10 @@
       "tab": 4,
       "pane": 2,
       "post_spawn_sleep": 0,
-      "modes": { "gnome": false, "terminator": true },
+      "modes": {
+        "gnome": false,
+        "terminator": true
+      },
       "command": "bash"
     },
     {
@@ -138,7 +192,10 @@
       "tab": 4,
       "pane": 3,
       "post_spawn_sleep": 0,
-      "modes": { "gnome": false, "terminator": true },
+      "modes": {
+        "gnome": false,
+        "terminator": true
+      },
       "command": "bash"
     },
     {
@@ -147,7 +204,10 @@
       "tab": 4,
       "pane": 4,
       "post_spawn_sleep": 0,
-      "modes": { "gnome": false, "terminator": true },
+      "modes": {
+        "gnome": false,
+        "terminator": true
+      },
       "command": "bash"
     }
   ]

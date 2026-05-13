@@ -34,14 +34,14 @@ QList<PatternHit> findByRegex(const QString &posixExtRegex)
   p.waitForFinished(3000);
   const QString stdoutText = QString::fromLocal8Bit(p.readAllStandardOutput());
   for (const QString &line : stdoutText.split('\n', Qt::SkipEmptyParts)) {
-    const int sp = line.indexOf(' ');
+    const qsizetype sp = line.indexOf(' ');
     if (sp <= 0) continue;
     bool ok = false;
-    const int pidI = line.left(sp).toInt(&ok);
+    const int pidI = line.left(static_cast<int>(sp)).toInt(&ok);
     if (!ok || pidI <= 1) continue;
     PatternHit h;
     h.pid       = static_cast<pid_t>(pidI);
-    h.cmdline   = line.mid(sp + 1).trimmed();
+    h.cmdline   = line.mid(static_cast<int>(sp) + 1).trimmed();
     h.matchedBy = posixExtRegex;
     hits.append(h);
   }
@@ -50,25 +50,43 @@ QList<PatternHit> findByRegex(const QString &posixExtRegex)
 
 }
 
-int main(int argc, char **argv)
+int carla_cli_cleanup_main(int argc, char **argv)
 {
   QCoreApplication app(argc, argv);
   QTextStream out(stdout);
 
-
-
-
   static const QStringList patterns = {
-    QStringLiteral("(^|/)carla-studio-cli_vehicle-import($| )"),
-    QStringLiteral("(^|/)carla-studio-vehicle-preview($| )"),
-    QStringLiteral("(^|/)carla-studio-vehicle-import-test($| )"),
-    QStringLiteral("(^|/)carla-studio-gui-matrix-test($| )"),
-    QStringLiteral("(^|/)carla-studio($| )"),
-    QStringLiteral("UnrealEditor[^ ]*[ ].*CarlaUnreal\\.uproject"),
-    QStringLiteral("UnrealEditor[^ ]*[ ].*-run=cook"),
+    // CARLA simulator processes
     QStringLiteral("CarlaUnreal-Linux-Shipping"),
     QStringLiteral("(^|/)CarlaUnreal\\.sh"),
     QStringLiteral("(^|/)CarlaUE[45]\\.sh"),
+    QStringLiteral("UnrealEditor[^ ]*[ ].*CarlaUnreal\\.uproject"),
+    QStringLiteral("UnrealEditor[^ ]*[ ].*-run=cook"),
+    // CARLA Studio main binary
+    QStringLiteral("(^|/)carla-studio($| )"),
+    // CARLA Studio CLI sub-binaries
+    QStringLiteral("(^|/)carla-studio-cli_setup($| )"),
+    QStringLiteral("(^|/)carla-studio-cli_start($| )"),
+    QStringLiteral("(^|/)carla-studio-cli_stop($| )"),
+    QStringLiteral("(^|/)carla-studio-cli_maps($| )"),
+    QStringLiteral("(^|/)carla-studio-cli_sensor($| )"),
+    QStringLiteral("(^|/)carla-studio-cli_actuate($| )"),
+    QStringLiteral("(^|/)carla-studio-cli_healthcheck($| )"),
+    QStringLiteral("(^|/)carla-studio-cli_vehicle-import($| )"),
+    QStringLiteral("(^|/)carla-studio-vehicle-preview($| )"),
+    // CARLA Studio test suite binaries
+    QStringLiteral("(^|/)carla-studio-test-suite($| )"),
+    QStringLiteral("(^|/)carla-studio-vehicle-import-test($| )"),
+    QStringLiteral("(^|/)carla-studio-gui-matrix-test($| )"),
+    // wget/tar spawned by setup CLI for CARLA downloads
+    QStringLiteral("wget[^ ].*carla-releases"),
+    QStringLiteral("wget[^ ].*tiny\\.carla\\.org"),
+    QStringLiteral("tar[^ ]*.*CARLA_.*\\.tar\\.gz"),
+    // git clone/pull spawned by maps CLI (community maps) or setup CLI (source build)
+    QStringLiteral("git[^ ]*[ ]clone[^ ]*.*mcity"),
+    QStringLiteral("git[^ ]*[ ]clone[^ ]*.*apollo"),
+    QStringLiteral("git[^ ]*[ ]clone[^ ]*.*carla-simulator"),
+    QStringLiteral("git[^ ]*[ ]submodule.*recursive"),
   };
 
   const pid_t myPid     = getpid();
@@ -83,10 +101,6 @@ int main(int argc, char **argv)
       all.append(h);
     }
   }
-
-
-
-
 
   QList<PatternHit> killable;
   for (const PatternHit &h : all) {
@@ -112,7 +126,6 @@ int main(int argc, char **argv)
     ::kill(h.pid, SIGKILL);
   }
   out.flush();
-
 
   QProcess::execute("/bin/sh", QStringList() << "-c" << "sleep 1");
   QSet<pid_t> survivors;

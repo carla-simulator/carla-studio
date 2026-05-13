@@ -36,14 +36,9 @@
 #include "Engine/Blueprint.h"
 #include <util/ue-header-guard-end.h>
 
-
 static constexpr int32 GImporterPort = 18583;
 
 static constexpr int32 GMaxMessageBytes = 10 * 1024 * 1024;
-
-
-
-
 
 FVehicleImporterServer* UVehicleImporter::ServerRunnable = nullptr;
 FRunnableThread*        UVehicleImporter::ServerThread   = nullptr;
@@ -74,10 +69,6 @@ void UVehicleImporter::StopServer()
   delete ServerRunnable;
   ServerRunnable = nullptr;
 }
-
-
-
-
 
 FVehicleImporterServer::FVehicleImporterServer()  = default;
 FVehicleImporterServer::~FVehicleImporterServer() = default;
@@ -138,10 +129,6 @@ void FVehicleImporterServer::Stop()
   }
 }
 
-
-
-
-
 static bool RecvAll(FSocket* S, uint8* Buf, int32 Len)
 {
   int32 Received = 0;
@@ -195,11 +182,6 @@ void FVehicleImporterServer::ServeClient(FSocket* Client)
   const FString JsonStr = FString(UTF8_TO_TCHAR(
     reinterpret_cast<const ANSICHAR*>(Body.GetData())));
 
-
-
-
-
-
   FString Response;
   TSharedPtr<FJsonObject> Root;
   TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(JsonStr);
@@ -251,7 +233,6 @@ void FVehicleImporterServer::ServeClient(FSocket* Client)
     }
   }
 
-
   FTCHARToUTF8 ResponseUTF8(*Response);
   const int32 RespLen = ResponseUTF8.Length();
   uint8 RespLenBuf[4] = {
@@ -263,10 +244,6 @@ void FVehicleImporterServer::ServeClient(FSocket* Client)
   SendAll(Client, RespLenBuf, 4);
   SendAll(Client, reinterpret_cast<const uint8*>(ResponseUTF8.Get()), RespLen);
 }
-
-
-
-
 
 static float JF(const TSharedPtr<FJsonObject>& O, const FString& K, float Def = 0.f)
 {
@@ -343,13 +320,6 @@ FString FVehicleImporterServer::MakeResponse(bool bOk, const FString& Path, cons
   return Out;
 }
 
-
-
-
-
-
-
-
 static FString SanitizeAssetName(const FString& In)
 {
   FString Out;
@@ -375,10 +345,6 @@ static UStaticMesh* ImportStaticMesh(const FString& FilePath,
   Task->DestinationPath = ContentPath;
   Task->DestinationName = SanitizeAssetName(AssetName);
 
-
-
-
-
   Task->bSave           = false;
   Task->bAutomated      = true;
   Task->bReplaceExisting = true;
@@ -392,12 +358,6 @@ static UStaticMesh* ImportStaticMesh(const FString& FilePath,
     return nullptr;
   UStaticMesh* Mesh = Cast<UStaticMesh>(Imported[0]);
   if (!Mesh) return nullptr;
-
-
-
-
-
-
 
   if (Mesh->GetNumSourceModels() > 0)
   {
@@ -428,12 +388,6 @@ static TSubclassOf<UChaosVehicleWheel> CreateWheelBlueprint(
   UBlueprint* BP = Cast<UBlueprint>(Asset);
   if (!BP || !BP->GeneratedClass) return nullptr;
 
-
-
-
-
-
-
   UChaosVehicleWheel* Defaults =
     Cast<UChaosVehicleWheel>(BP->GeneratedClass->ClassDefaultObject);
   if (Defaults)
@@ -452,16 +406,10 @@ FString FVehicleImporterServer::ProcessSpec(const FVehicleImportSpec& Spec)
   UE_LOG(LogCarlaTools, Display, TEXT("VI.ProcessSpec: enter (vehicle=%s mesh=%s)"),
          *Spec.VehicleName, *Spec.MeshFilePath);
 
-
   FString ContentRoot = Spec.ContentPath;
   if (ContentRoot.EndsWith(TEXT("/")))
     ContentRoot.RemoveFromEnd(TEXT("/"));
   const FString VehicleContentPath = ContentRoot / Spec.VehicleName;
-
-
-
-
-
 
   if (UEditorAssetLibrary::DoesDirectoryExist(VehicleContentPath))
   {
@@ -470,7 +418,6 @@ FString FVehicleImporterServer::ProcessSpec(const FVehicleImportSpec& Spec)
     UEditorAssetLibrary::DeleteDirectory(VehicleContentPath);
   }
 
-
   UE_LOG(LogCarlaTools, Display, TEXT("VI.ProcessSpec: step 1/5 - importing body mesh"));
   UStaticMesh* BodyMesh = ImportStaticMesh(
     Spec.MeshFilePath, VehicleContentPath,
@@ -478,7 +425,6 @@ FString FVehicleImporterServer::ProcessSpec(const FVehicleImportSpec& Spec)
   if (!BodyMesh)
     return MakeResponse(false, TEXT(""), TEXT("Failed to import mesh: ") + Spec.MeshFilePath);
   UE_LOG(LogCarlaTools, Display, TEXT("VI.ProcessSpec: body mesh imported OK"));
-
 
   UE_LOG(LogCarlaTools, Display, TEXT("VI.ProcessSpec: step 2/5 - creating 4 wheel blueprints"));
   auto MakeWheelBP = [&](const FString& Suffix, const FWheelImportSpec& W)
@@ -502,8 +448,6 @@ FString FVehicleImporterServer::ProcessSpec(const FVehicleImportSpec& Spec)
   if (!WheelFL || !WheelFR || !WheelRL || !WheelRR)
     return MakeResponse(false, TEXT(""), TEXT("Failed to create wheel blueprints"));
 
-
-
   UE_LOG(LogCarlaTools, Display, TEXT("VI.ProcessSpec: step 3/5 - loading base BP %s"),
          *Spec.BaseVehicleBP);
   UClass* BaseClass = nullptr;
@@ -517,8 +461,6 @@ FString FVehicleImporterServer::ProcessSpec(const FVehicleImportSpec& Spec)
   if (!BaseClass)
   {
 
-
-
     UObject* TplObj = UEditorAssetLibrary::LoadAsset(
       TEXT("/Game/Carla/Blueprints/USDImportTemplates/BaseUSDImportVehicle"));
     if (UBlueprint* TplBP = Cast<UBlueprint>(TplObj))
@@ -527,10 +469,6 @@ FString FVehicleImporterServer::ProcessSpec(const FVehicleImportSpec& Spec)
   if (!BaseClass)
     return MakeResponse(false, TEXT(""),
       TEXT("Could not resolve base vehicle class - set base_vehicle_bp in the spec"));
-
-
-
-
 
   FMergedVehicleMeshParts Parts;
   Parts.Body = BodyMesh;
@@ -545,14 +483,6 @@ FString FVehicleImporterServer::ProcessSpec(const FVehicleImportSpec& Spec)
   WheelTemplates.WheelRL = WheelRL;
   WheelTemplates.WheelRR = WheelRR;
 
-
-
-
-
-
-
-
-
   USkeletalMeshComponent* SkelComp = nullptr;
   auto TakeIfBetter = [&](USkeletalMeshComponent* C) {
     if (!C) return;
@@ -564,7 +494,6 @@ FString FVehicleImporterServer::ProcessSpec(const FVehicleImportSpec& Spec)
 InspectBaseClass:
   AActor* TemplateDefault = BaseClass->GetDefaultObject<AActor>();
   SkelComp = nullptr;
-
 
   if (TemplateDefault)
   {
@@ -580,7 +509,6 @@ InspectBaseClass:
       TakeIfBetter(Cast<USkeletalMeshComponent>(C));
     }
   }
-
 
   if (!SkelComp || !SkelComp->GetSkeletalMeshAsset())
   {
@@ -608,12 +536,6 @@ InspectBaseClass:
       WalkClass = WalkClass->GetSuperClass();
     }
   }
-
-
-
-
-
-
 
   if (!SkelComp || !SkelComp->GetSkeletalMeshAsset())
   {
@@ -670,7 +592,6 @@ InspectBaseClass:
         SkelMesh ? *SkelMesh->GetName() : TEXT("null"),
         PhysAsset ? *PhysAsset->GetName() : TEXT("null")));
 
-
   UE_LOG(LogCarlaTools, Display, TEXT("VI.ProcessSpec: step 5/5 - generating vehicle blueprint"));
   UWorld* World = GEditor ? GEditor->GetEditorWorldContext().World() : nullptr;
   if (!World)
@@ -680,12 +601,6 @@ InspectBaseClass:
 
   UUSDImporterWidget::GenerateNewVehicleBlueprint(
     World, BaseClass, SkelMesh, PhysAsset, BPPath, Parts, WheelTemplates);
-
-
-
-
-
-
 
   TArray<FString> ToSave;
   ToSave.Add(VehicleContentPath / (Spec.VehicleName + TEXT("_body")));
@@ -708,10 +623,6 @@ InspectBaseClass:
   return MakeResponse(true, BPPath, TEXT(""));
 }
 
-
-
-
-
 FString FVehicleImporterServer::ProcessSpawn(const FSpawnRequest& Req)
 {
   UE_LOG(LogCarlaTools, Display, TEXT("VI.ProcessSpawn: enter (asset=%s loc=%s yaw=%.1f)"),
@@ -720,15 +631,7 @@ FString FVehicleImporterServer::ProcessSpawn(const FSpawnRequest& Req)
   if (Req.AssetPath.IsEmpty())
     return MakeResponse(false, TEXT(""), TEXT("spawn: asset_path missing"));
 
-
-
-
-
-
-
   auto fixupClassPath = [](const FString& In) -> FString {
-
-
 
     if (In.EndsWith(TEXT("_C"))) return In;
     int32 Dot = INDEX_NONE; In.FindLastChar(TEXT('.'), Dot);
@@ -759,7 +662,6 @@ FString FVehicleImporterServer::ProcessSpawn(const FSpawnRequest& Req)
     AttemptedPaths += TEXT(" | ") + Fixed;
     Cls = LoadClass<AActor>(nullptr, *Fixed);
   }
-
 
   if (!Cls)
   {

@@ -19,6 +19,6 @@ make all CARLA_DIR=/path/to/carla/source
 
 ## Docs
 
-- [BUILD.md](BUILD.md) - prerequisites, build options, troubleshooting
-- [USAGE.md](USAGE.md) - CLI and GUI usage reference
-- [DEVELOP.md](DEVELOP.md) - code structure and contribution notes
+- [BUILD.md](docs/BUILD.md) - prerequisites, build options, troubleshooting
+- [USAGE.md](docs/usage/USAGE.md) - CLI and GUI usage reference
+- [DEVELOP.md](docs/DEVELOP.md) - code structure and contribution notes

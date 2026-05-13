@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+#include <QApplication>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
-#include <QGuiApplication>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QString>
@@ -12,6 +12,7 @@
 #include <QtTest/QtTest>
 
 extern void runCliPipelineTests(int argc, char **argv, int &exit_code);
+extern void runGuiMatrixTests(int argc, char **argv, int &exit_code);
 
 static bool captureScreenshots(const QString &studioBin,
                                 const QString &out_dir,
@@ -87,7 +88,7 @@ static void patchUsageMd(const QString &usageMdPath, const QString &screenshotsD
 }
 
 int main(int argc, char *argv[]) {
-    QGuiApplication app(argc, argv);
+    QApplication app(argc, argv);
 
     const QStringList args = app.arguments();
     const bool updateDocs = args.contains("--update-documentation");
@@ -104,31 +105,23 @@ int main(int argc, char *argv[]) {
                                bin_dir + "/../../Apps/CarlaStudio");
 #endif
 
+    // Allow up to 1 h per test function so live-sim tests (mcity clone ~270 s,
+    // CARLA boot ~120 s, source build ~3 h) don't trip the Qt Test watchdog.
+    // Must be set BEFORE QTest::qExec() is called — initTestCase() is too late.
+    qputenv("QTEST_TIMEOUT", "3600");
+
     int exit_code = 0;
 
     QTextStream(stdout) << "\n=== CLI pipeline tests ===\n";
     runCliPipelineTests(argc, argv, exit_code);
 
+    int gui_code = 0;
     QTextStream(stdout) << "\n=== GUI matrix tests ===\n";
-    QProcess gui_proc;
-    gui_proc.setProgram(bin_dir + "/test-suite_carla-studio-gui");
-    gui_proc.setProcessChannelMode(QProcess::ForwardedChannels);
-    gui_proc.start();
-    const bool gui_started = gui_proc.waitForStarted(5000);
-    if (!gui_started) {
-        QTextStream(stderr) << "[test-suite] test-suite_carla-studio-gui did not start\n";
-        exit_code = 1;
-    } else {
-        gui_proc.waitForFinished(120000);
-        if (gui_proc.exitCode() != 0) {
-            QTextStream(stderr) << "[test-suite] GUI matrix tests FAILED\n";
-            exit_code = 1;
-        }
-    }
+    runGuiMatrixTests(argc, argv, gui_code);
+    exit_code |= gui_code;
 
     if (updateDocs) {
-        const bool gui_ok = gui_started && gui_proc.exitCode() == 0;
-        if (!gui_ok) {
+        if (gui_code != 0) {
             QTextStream(stdout) << "[test-suite] skipping --update-documentation (GUI tests did not pass)\n";
         } else {
             const QString screenshotsDir = repoRoot + "/docs/usage/tabs";
