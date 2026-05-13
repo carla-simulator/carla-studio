@@ -176,15 +176,17 @@ int carla_cli_stack_main(int argc, char **argv) {
     QString scenario = "default_sumo";
     QString vehicleType = "vehicle.lincoln.mkz_2020";
     QString port = "2000";
+    QString workspaceRoot = QDir::currentPath();
 
     for (int i = 1; i < args.size(); ++i) {
         const QString &a = args[i];
         if (a == "--terminator" || a == "-t")         useTerminator = true;
-        else if ((a == "--carla-dir" || a == "-c") && i + 1 < args.size())  carlaDir = args[++i];
-        else if ((a == "--map" || a == "-m") && i + 1 < args.size())        mapName  = args[++i];
-        else if ((a == "--scenario" || a == "-s") && i + 1 < args.size())   scenario = args[++i];
-        else if ((a == "--port" || a == "-p") && i + 1 < args.size())       port     = args[++i];
-        else if ((a == "--vehicle-type") && i + 1 < args.size())            vehicleType = args[++i];
+        else if ((a == "--carla-dir" || a == "-c") && i + 1 < args.size())      carlaDir      = args[++i];
+        else if ((a == "--map" || a == "-m") && i + 1 < args.size())            mapName       = args[++i];
+        else if ((a == "--scenario" || a == "-s") && i + 1 < args.size())       scenario      = args[++i];
+        else if ((a == "--port" || a == "-p") && i + 1 < args.size())           port          = args[++i];
+        else if ((a == "--vehicle-type") && i + 1 < args.size())                vehicleType   = args[++i];
+        else if ((a == "--workspace-root" || a == "-w") && i + 1 < args.size()) workspaceRoot = args[++i];
     }
 
     const QString jsonPath = findJson(carlaDir);
@@ -202,8 +204,8 @@ int carla_cli_stack_main(int argc, char **argv) {
     const QJsonArray terminals = doc.object()["terminals"].toArray();
     const QJsonArray tabs      = doc.object()["tabs"].toArray();
 
-    const QString parentDir = QFileInfo(jsonPath).absoluteDir().absolutePath();
-    const QString scriptDir = parentDir;
+    const QString parentDir = workspaceRoot;
+    const QString scriptDir = workspaceRoot;
     const QString pythonBin = "python3";
     const QString modeKey   = useTerminator ? "terminator" : "gnome";
 

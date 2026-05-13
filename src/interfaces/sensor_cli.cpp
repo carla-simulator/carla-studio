@@ -11,7 +11,7 @@
 //       Launch the interactive calibration viewer (needs DISPLAY).
 //
 //   carla-studio sensor fisheye --configure --model <model> --fov <degrees>
-//       Custom fisheye config (model: equidistant|equisolid, fov: 0-360).
+//       Custom fisheye config (model: fisheye-equidistant|fisheye-equisolid, fov: 0-360).
 
 #include <QCoreApplication>
 #include <QDir>

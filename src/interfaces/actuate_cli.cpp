@@ -81,7 +81,7 @@ int carla_cli_actuate_main(int argc, char **argv) {
     if (chosen_level == 1) {
         // L1: persist the l1 feature choice (acc by default; --lane-keep overrides)
         const bool lane_keep = args.contains("--lane-keep");
-        settings.setValue("actuate/sae_l1_feature", lane_keep ? "lane_keep" : "acc");
+        settings.setValue("actuate/sae_l1_feature", lane_keep ? "lanekeep" : "acc");
         log(QString("L1 feature: %1").arg(lane_keep ? "Lane Keeping" : "Adaptive Cruise Control"));
     }
 

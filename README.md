@@ -7,7 +7,7 @@ Uses interfaces like libCARLA and PythonAPI to allow further standard interfacin
 ## Build 
 
 ```bash
-make all
+make
 ```
 Binary: `app/carla-studio`. Point the app to your CARLA installation at runtime via `CARLA_ROOT` and it resolves paths automatically.
 

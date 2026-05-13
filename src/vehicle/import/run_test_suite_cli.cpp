@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
     // Allow up to 1 h per test function so live-sim tests (mcity clone ~270 s,
     // CARLA boot ~120 s, source build ~3 h) don't trip the Qt Test watchdog.
     // Must be set BEFORE QTest::qExec() is called — initTestCase() is too late.
-    qputenv("QTEST_TIMEOUT", "3600");
+    qputenv("QTEST_TIMEOUT", qgetenv("CARLA_LONG_TESTS").isEmpty() ? "3600" : "10800");
 
     int exit_code = 0;
 

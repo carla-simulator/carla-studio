@@ -13,7 +13,6 @@
 #include <QProcess>
 #include <QString>
 #include <QStringList>
-#include <QStandardPaths>
 #include <QTextStream>
 
 namespace {
@@ -111,27 +110,18 @@ int carla_cli_start_main(int argc, char **argv) {
     if (!mapName.isEmpty())
         launch_args << QString("-map=%1").arg(mapName);
 
-    const QString cmd = QString("'%1' %2 >/tmp/carla_studio_launch.log 2>&1 & echo $!")
-                          .arg(binary)
-                          .arg(launch_args.join(' '));
-
     log(QString("Launching: %1 %2").arg(binary).arg(launch_args.join(' ')));
     if (!mapName.isEmpty()) log("Map: " + mapName);
 
-    QProcess shell;
-    shell.start("/bin/bash", QStringList() << "-c" << cmd);
-    shell.waitForFinished(15000);
-    const QString pidText = QString::fromLocal8Bit(shell.readAllStandardOutput()).trimmed();
-    bool ok = false;
-    const qint64 pid = pidText.toLongLong(&ok);
-    if (!ok || pid <= 0) {
-        logErr("Failed to launch CARLA — no PID returned.");
-        logErr("Check /tmp/carla_studio_launch.log for details.");
+    qint64 pid = 0;
+    if (!QProcess::startDetached(binary, launch_args, QFileInfo(binary).absolutePath(), &pid) || pid <= 0) {
+        logErr("Failed to launch CARLA.");
+        logErr("Check that the binary is executable: " + binary);
         return 1;
     }
 
     writePid(pid);
-    log(QString("CARLA started (PID %1). Log: /tmp/carla_studio_launch.log").arg(pid));
+    log(QString("CARLA started (PID %1).").arg(pid));
     log("RPC port: " + QString::number(rpc_port));
 
     if (showProgress) {

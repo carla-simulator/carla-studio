@@ -8,8 +8,7 @@ make all           # build everything (app + test binaries)
 ```
 
 Produced binaries in `app/`:
-- `test-suite_carla-studio-cli-linux-x86_64` — CLI pipeline + GUI matrix runner
-- `test-suite_carla-studio-gui-linux-x86_64` — GUI source-scan tests
+- `carla-studio-test-suite-linux-x86_64` — unified CLI pipeline + GUI matrix tests
 
 ---
 
@@ -17,8 +16,7 @@ Produced binaries in `app/`:
 
 ```bash
 cd app/
-./test-suite_carla-studio-cli-linux-x86_64
-./test-suite_carla-studio-gui-linux-x86_64
+./carla-studio-test-suite-linux-x86_64
 ```
 
 Tests that need a live sim or display use `QSKIP` — the suite never hangs.

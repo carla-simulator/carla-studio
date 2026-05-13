@@ -41,7 +41,7 @@ static bool pid_alive(qint64 pid) {
 static QList<qint64> pgrepPids(const QString &pattern) {
     QList<qint64> pids;
     QProcess p;
-    p.start("/bin/bash", {"-c", "pgrep -f " + pattern.toLocal8Bit() + " 2>/dev/null"});
+    p.start("pgrep", {"-f", pattern});
     p.waitForFinished(3000);
     for (const QString &tok : QString::fromLocal8Bit(p.readAllStandardOutput()).split('\n', Qt::SkipEmptyParts)) {
         bool ok = false;
