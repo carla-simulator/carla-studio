@@ -120,6 +120,34 @@ inline bool pid_is_alive(qint64 pid) {
 #endif
 }
 
+inline qint64 proc_cpu_jiffies(qint64 pid) {
+#if defined(Q_OS_LINUX) || defined(__linux__)
+  QFile f(QStringLiteral("/proc/%1/stat").arg(pid));
+  if (!f.open(QIODevice::ReadOnly)) return -1;
+  const QByteArray data = f.readAll();
+  const qsizetype rp = data.lastIndexOf(')');
+  if (rp < 0) return -1;
+  const QList<QByteArray> fields = data.mid(rp + 2).simplified().split(' ');
+  if (fields.size() < 13) return -1;
+  bool ok1 = false, ok2 = false;
+  const qint64 utime = fields[11].toLongLong(&ok1);
+  const qint64 stime = fields[12].toLongLong(&ok2);
+  return (ok1 && ok2) ? utime + stime : -1;
+#else
+  Q_UNUSED(pid);
+  return -1;
+#endif
+}
+
+inline int proc_clk_tck() {
+#if defined(Q_OS_LINUX) || defined(__linux__)
+  const long tck = sysconf(_SC_CLK_TCK);
+  return (tck > 0) ? static_cast<int>(tck) : 100;
+#else
+  return 100;
+#endif
+}
+
 inline bool platform_has_nvidia_smi() {
 #if defined(Q_OS_MAC) || defined(__APPLE__)
   return false;
