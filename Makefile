@@ -24,13 +24,63 @@ _STUDIO := carla-studio-$(_PLATFORM)-$(_ARCH)$(_APP_EXT)
 _CLI    := carla-studio-test-suite-$(_PLATFORM)-$(_ARCH)$(_EXT)
 
 ifdef CARLA_DIR
-_CARLA := -DCARLA_DIR="$(CARLA_DIR)"
+_CARLA_ABS   := $(abspath "$(CARLA_DIR)")
+_CARLA       := -DCARLA_DIR="$(_CARLA_ABS)"
+_CARLA_BUILD := $(_CARLA_ABS)/Build
+_CARLA_LIB   := $(_CARLA_ABS)/Build/LibCarla/libcarla-client.a
+
+ifdef UNREAL_DIR
+# Full build: delegates to CarlaSetup.sh (same as `carla-studio build --engine`).
+# Builds libcarla + UE5 simulator + shipping package in one shot.
+_UNREAL_ABS      := $(abspath $(UNREAL_DIR))
+_CARLA_SIM_STAMP := $(_CARLA_BUILD)/.carla-studio-setup-done
+
+$(_CARLA_SIM_STAMP):
+	@rm -rf "$(_CARLA_BUILD)"
+	CARLA_UNREAL_ENGINE_PATH="$(_UNREAL_ABS)" \
+	cmake -S "$(CARLA_DIR)" -B "$(_CARLA_BUILD)" \
+	  -DCMAKE_BUILD_TYPE=Release \
+	  -DCMAKE_TOOLCHAIN_FILE="$(_CARLA_ABS)/CMake/Toolchain.cmake" \
+	  -DBUILD_CARLA_CLIENT=ON \
+	  -DBUILD_CARLA_SERVER=ON \
+	  -DBUILD_CARLA_UNREAL=ON \
+	  -DBUILD_PYTHON_API=ON \
+	  -DBUILD_OSM2ODR=OFF \
+	  -DENABLE_ROS2=OFF
+	cmake --build "$(_CARLA_BUILD)" --target carla-client       -j$(JOBS)
+	cmake --build "$(_CARLA_BUILD)" --target carla-unreal       -j$(JOBS)
+	cmake --build "$(_CARLA_BUILD)" --target carla-unreal-editor -j$(JOBS)
+	@touch "$(_CARLA_SIM_STAMP)"
+
+$(_CARLA_LIB): $(_CARLA_SIM_STAMP)
+
+$(BUILD)/CMakeCache.txt: $(_CARLA_SIM_STAMP)
+	cmake -S src -B "$(BUILD)" -DCMAKE_BUILD_TYPE=Release $(_CARLA)
+
 else
-_CARLA :=
+# Client-only build: libcarla-client.a only, no UE5.
+$(_CARLA_LIB):
+	cmake -S "$(CARLA_DIR)" -B "$(_CARLA_BUILD)" \
+	  -DCMAKE_BUILD_TYPE=Release \
+	  -DBUILD_CARLA_CLIENT=ON \
+	  -DBUILD_CARLA_SERVER=OFF \
+	  -DBUILD_PYTHON_API=ON \
+	  -DBUILD_OSM2ODR=OFF \
+	  -DENABLE_ROS2=OFF
+	cmake --build "$(_CARLA_BUILD)" --target carla-client -j$(JOBS)
+
+$(BUILD)/CMakeCache.txt: $(_CARLA_LIB)
+	cmake -S src -B "$(BUILD)" -DCMAKE_BUILD_TYPE=Release $(_CARLA)
+
 endif
 
+else
+_CARLA :=
+
 $(BUILD)/CMakeCache.txt:
-	cmake -S src -B "$(BUILD)" -DCMAKE_BUILD_TYPE=Release $(_CARLA)
+	cmake -S src -B "$(BUILD)" -DCMAKE_BUILD_TYPE=Release
+
+endif
 
 _build: $(BUILD)/CMakeCache.txt
 	cmake --build "$(BUILD)" --target carla-studio -j$(JOBS)
@@ -101,10 +151,21 @@ all: $(BUILD)/CMakeCache.txt
 app: $(BUILD)/CMakeCache.txt
 	cmake --build "$(BUILD)" --target carla-studio -j$(JOBS)
 
+ifdef UNREAL_DIR
+_CARLA_SIM_ROOT := $(shell find "$(_CARLA_BUILD)/Package" -maxdepth 2 \
+  \( -name "CarlaUnreal-Linux-Shipping" -o -name "CarlaUnreal.sh" \
+     -o -name "CarlaUE5.sh" -o -name "CarlaUE4.sh" \) \
+  -printf '%h\n' 2>/dev/null | head -1)
+endif
+
 test: $(BUILD)/CMakeCache.txt
 	cmake --build "$(BUILD)" --target carla-studio -j$(JOBS)
 	cmake --build "$(BUILD)" --target test-suite   -j$(JOBS)
+ifdef _CARLA_SIM_ROOT
+	CARLA_SIM_ROOT="$(_CARLA_SIM_ROOT)" "$(BUILD)/carla-studio-test-suite$(_EXT)" --update-documentation
+else
 	"$(BUILD)/carla-studio-test-suite$(_EXT)" --update-documentation
+endif
 
 clean:
 	rm -rf "$(BUILD)"
@@ -116,7 +177,7 @@ ifeq ($(_PLATFORM), linux)
 endif
 
 help:
-	@echo "Usage: make [target] [CARLA_DIR=/path/to/carla/source]"
+	@echo "Usage: make [target] [CARLA_DIR=<path>] [UNREAL_DIR=<path>] [JOBS=N]"
 	@echo ""
 	@echo "Targets:"
 	@echo "  make             build + keep only carla-studio binary (default)"
@@ -129,5 +190,9 @@ help:
 	@echo "  make test        build + run full test suite"
 	@echo "  make clean       remove app/ and uninstall .desktop entry (Linux)"
 	@echo ""
-	@echo "  CARLA_DIR=<path>  link against CARLA source tree"
-	@echo "  JOBS=N            parallel build jobs (default: all cores via nproc)"
+	@echo "  CARLA_DIR=<path>   link against CARLA source tree (builds libcarla-client.a)"
+	@echo "  UNREAL_DIR=<path>  also build full UE5 simulator + shipping package"
+	@echo "                     requires CARLA_DIR; builds carla-unreal-package-shipping"
+	@echo "                     simulator lands at CARLA_DIR/Build/Package/Carla-*-Linux-Shipping/"
+	@echo "                     test target sets CARLA_SIM_ROOT automatically"
+	@echo "  JOBS=N             parallel build jobs (default: all cores via nproc)"

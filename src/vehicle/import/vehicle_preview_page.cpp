@@ -889,6 +889,23 @@ static bool installMeshGeometry(Qt3DCore::QEntity *meshEntity,
   posAttr->setCount(static_cast<uint>(nV));
   geom->addAttribute(posAttr);
 
+  if (g.has_normals()) {
+    QByteArray nBuf;
+    nBuf.resize(nV * 3 * static_cast<int>(sizeof(float)));
+    std::memcpy(nBuf.data(), g.normals.data(), static_cast<size_t>(nBuf.size()));
+    auto *nBuffer = new QBuffer(geom);
+    nBuffer->setData(nBuf);
+    auto *normAttr = new QAttribute(geom);
+    normAttr->setName(QAttribute::defaultNormalAttributeName());
+    normAttr->setVertexBaseType(QAttribute::Float);
+    normAttr->setVertexSize(3);
+    normAttr->setAttributeType(QAttribute::VertexAttribute);
+    normAttr->setBuffer(nBuffer);
+    normAttr->setByteStride(3 * sizeof(float));
+    normAttr->setCount(static_cast<uint>(nV));
+    geom->addAttribute(normAttr);
+  }
+
   const int nF = g.face_count();
   QByteArray iBuf;
   iBuf.resize(nF * 3 * static_cast<int>(sizeof(quint32)));

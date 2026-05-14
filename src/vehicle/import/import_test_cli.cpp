@@ -1123,7 +1123,7 @@ int runVehicleImportCli(int argc, char **argv)
 #ifdef CARLA_STUDIO_WITH_LIBCARLA
     if (r.spawned) {
       try {
-        carla::client::Client client("localhost", carla_port);
+        carla::client::Client client("localhost", static_cast<uint16_t>(carla_port));
         client.SetTimeout(std::chrono::seconds(20));
         auto world = client.GetWorld();
         std::shared_ptr<carla::client::Actor> ours;

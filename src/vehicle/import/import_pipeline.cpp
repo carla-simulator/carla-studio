@@ -11,6 +11,7 @@
 #include "vehicle/import/carla_spawn.h"
 #include "vehicle/import/importer_client.h"
 #include "vehicle/import/merged_spec_builder.h"
+#include "vehicle/import/mesh_analysis.h"
 #include "vehicle/import/mesh_geometry.h"
 #include "vehicle/import/vehicle_preview_window.h"
 
@@ -34,13 +35,50 @@ void emitLog(const ImportPipelineCallbacks &cb, const QString &msg) {
   if (cb.log) cb.log(msg);
 }
 
-VehicleSpec buildSpecFromInput(const ImportPipelineInput &in) {
+VehicleSpec buildSpecFromInput(const ImportPipelineInput &in,
+                               const ImportPipelineCallbacks &cb) {
   VehicleSpec s;
   MeshGeometry g = load_mesh_geometry(in.mesh_path);
-  if (g.valid) {
-    const MeshAnalysisResult ar = analyze_mesh(g, 1.0f);
+  if (!g.valid) {
+    emitLog(cb, QString("[mesh-analysis] could not load geometry from %1 "
+                        "(unsupported format or empty file); using fallback wheel positions.")
+                  .arg(QFileInfo(in.mesh_path).fileName()));
+  } else {
+    const float scale_to_cm = detect_scale_to_cm(g);
+    emitLog(cb, QString("[mesh-analysis] loaded %1 verts, %2 tris from %3  "
+                        "unit→cm scale=×%4")
+                  .arg(g.vertex_count()).arg(g.face_count())
+                  .arg(QFileInfo(in.mesh_path).fileName())
+                  .arg(scale_to_cm, 0, 'f', 2));
+    const MeshAnalysisResult ar = analyze_mesh(g, scale_to_cm);
     if (ar.ok) {
-      s = build_spec_from_analysis(ar, in.vehicle_name, in.mesh_path, 1.0f, 2, 0);
+      s = build_spec_from_analysis(ar, in.vehicle_name, in.mesh_path, scale_to_cm, 2, 0);
+      emitLog(cb, QString("[mesh-analysis] size=%1  chassis=%2×%3×%4 cm  "
+                          "wheels_detected=%5")
+                    .arg(size_class_name(ar.size_class))
+                    .arg(static_cast<int>(ar.chassis_x_max - ar.chassis_x_min))
+                    .arg(static_cast<int>(ar.chassis_y_max - ar.chassis_y_min))
+                    .arg(static_cast<int>(ar.chassis_z_max - ar.chassis_z_min))
+                    .arg(ar.has_four_wheels ? "yes" : "no"));
+      if (ar.has_four_wheels) {
+        const char *wlabels[4] = { "FL", "FR", "RL", "RR" };
+        for (size_t i = 0; i < 4 && i < ar.wheels.size(); ++i) {
+          const WheelCandidate &w = ar.wheels[i];
+          emitLog(cb, QString("[mesh-analysis]   wheel[%1] cx=%.1f cy=%.1f cz=%.1f "
+                              "r=%.1f w=%.1f")
+                        .arg(wlabels[i])
+                        .arg(w.cx).arg(w.cy).arg(w.cz)
+                        .arg(w.radius).arg(w.width));
+        }
+      } else {
+        emitLog(cb, "[mesh-analysis] 4-wheel detection failed — "
+                    "wheels may be topologically merged with body or "
+                    "aspect-ratio filter excluded them; "
+                    "derived wheel anchors from chassis AABB instead.");
+      }
+    } else {
+      emitLog(cb, "[mesh-analysis] analysis returned no result "
+                  "(zero faces after loading?); using fallback wheel positions.");
     }
   }
   if (s.name.isEmpty()) {
@@ -54,12 +92,14 @@ VehicleSpec buildSpecFromInput(const ImportPipelineInput &in) {
     s.wheels[1].x =  140; s.wheels[1].y =  80; s.wheels[1].z = 35;
     s.wheels[2].x = -140; s.wheels[2].y = -80; s.wheels[2].z = 35;
     s.wheels[3].x = -140; s.wheels[3].y =  80; s.wheels[3].z = 35;
+    emitLog(cb, "[mesh-analysis] fallback: using default sedan wheel positions "
+                "(140/80/35 cm); review calibration window and adjust if needed.");
   }
-  s.content_path   = "/Game/Carla/Static/Vehicles/4Wheeled";
+  s.content_path    = "/Game/Carla/Static/Vehicles/4Wheeled";
   s.base_vehicle_bp = "/Game/Carla/Blueprints/Vehicles/Mustang/BP_Mustang";
-  s.mass          = in.knobs.mass;
-  s.susp_damping   = in.knobs.susp_damping;
-  s.size_class     = in.knobs.size_class;
+  s.mass           = in.knobs.mass;
+  s.susp_damping    = in.knobs.susp_damping;
+  s.size_class      = in.knobs.size_class;
   for (size_t i = 0; i < 4; ++i) {
     s.wheels[i].max_steer_angle  = (i < 2) ? in.knobs.max_steer_angle : 0.f;
     s.wheels[i].max_brake_torque = in.knobs.max_brake_torque;
@@ -107,7 +147,7 @@ ImportPipelineResult run_import_pipeline(const ImportPipelineInput &inIn,
     return res;
   }
 
-  VehicleSpec spec = buildSpecFromInput(in);
+  VehicleSpec spec = buildSpecFromInput(in, cb);
   if (!in.tires_path.isEmpty()
       && QFileInfo(in.mesh_path).suffix().toLower() == "obj"
       && QFileInfo(in.tires_path).suffix().toLower() == "obj"

@@ -381,7 +381,8 @@ SpawnResult spawn_in_running_carla(const QString &make, const QString &model,
   return sr;
 #else
   try {
-    auto client = carla::client::Client(host.toStdString(), port);
+    auto client = carla::client::Client(host.toStdString(),
+                                        static_cast<uint16_t>(port));
     client.SetTimeout(std::chrono::seconds(60));
     client.GetServerVersion();
     auto world  = client.GetWorld();
@@ -521,7 +522,8 @@ DriveTestResult drive_test_vehicle(const QString &make, const QString &model,
   return r;
 #else
   try {
-    auto client = carla::client::Client(host.toStdString(), port);
+    auto client = carla::client::Client(host.toStdString(),
+                                        static_cast<uint16_t>(port));
     client.SetTimeout(std::chrono::seconds(60));
     client.GetServerVersion();
     auto world = client.GetWorld();

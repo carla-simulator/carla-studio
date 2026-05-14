@@ -3332,8 +3332,8 @@ int main(int argc, char *argv[]) {
 
       const float cameraDistance = 6.0f;
       cg::Location cameraLocation = vehicleTransform.location;
-      cameraLocation.x -= static_cast<float>(std::cos(yawRad) * cameraDistance);
-      cameraLocation.y -= static_cast<float>(std::sin(yawRad) * cameraDistance);
+      cameraLocation.x -= static_cast<float>(std::cos(yawRad) * static_cast<double>(cameraDistance));
+      cameraLocation.y -= static_cast<float>(std::sin(yawRad) * static_cast<double>(cameraDistance));
       cameraLocation.z += 2.6f;
       cg::Rotation cameraRotation(-12.0f, vehicleTransform.rotation.yaw, 0.0f);
 
@@ -3877,8 +3877,8 @@ int main(int argc, char *argv[]) {
         for (int xi = 0; xi < 4; ++xi) {
           for (int yi = 0; yi < 11; ++yi) {
             if ((xi + yi) % 2 != 0) continue;
-            const float x0 = 88.0f + xi * 1.0f;
-            const float y0 = -5.5f + yi * 1.0f;
+            const float x0 = 88.0f + static_cast<float>(xi);
+            const float y0 = -5.5f + static_cast<float>(yi);
             for (float dy = 0.0f; dy <= 1.0f; dy += 0.12f) {
               dbg.DrawLine(cg::Location(x0,        y0 + dy, 0.12f),
                            cg::Location(x0 + 1.0f, y0 + dy, 0.12f),
@@ -10029,7 +10029,7 @@ int main(int argc, char *argv[]) {
                 double maxMag = 1e-6;
                 for (size_t i = 0; i < flow->size(); ++i) {
                   const auto &p = (*flow)[i];
-                  const double m = std::sqrt(double(p.x) * p.x + double(p.y) * p.y);
+                  const double m = std::sqrt(double(p.x) * double(p.x) + double(p.y) * double(p.y));
                   if (m > maxMag) maxMag = m;
                 }
 
@@ -10038,12 +10038,12 @@ int main(int argc, char *argv[]) {
                   uchar *L = frame.scanLine(y);
                   for (int x = 0; x < w; ++x) {
                     const auto &p = (*flow)[size_t(y * w + x)];
-                    const double mag = std::sqrt(double(p.x) * p.x + double(p.y) * p.y);
+                    const double mag = std::sqrt(double(p.x) * double(p.x) + double(p.y) * double(p.y));
                     const double ang = std::atan2(double(p.y), double(p.x));
                     const double hue = (ang + M_PI) / (2.0 * M_PI);
                     const double sat = std::min(1.0, mag / maxMag);
-                    const QColor c = QColor::fromHsvF(hue, sat, 1.0);
-                    L[x*3+0] = c.red(); L[x*3+1] = c.green(); L[x*3+2] = c.blue();
+                    const QColor c = QColor::fromHsvF(static_cast<float>(hue), static_cast<float>(sat), 1.0f);
+                    L[x*3+0] = static_cast<uchar>(c.red()); L[x*3+1] = static_cast<uchar>(c.green()); L[x*3+2] = static_cast<uchar>(c.blue());
                   }
                 }
                 postImageToSink(tab, frame);
@@ -10107,7 +10107,7 @@ int main(int argc, char *argv[]) {
                   QString("accel=(%1,%2,%3)  gyro=(%4,%5,%6)  compass=%7°")
                     .arg(a.x, 0, 'f', 2).arg(a.y, 0, 'f', 2).arg(a.z, 0, 'f', 2)
                     .arg(g.x, 0, 'f', 2).arg(g.y, 0, 'f', 2).arg(g.z, 0, 'f', 2)
-                    .arg(m->GetCompass() * 180.0 / M_PI, 0, 'f', 1),
+                    .arg(static_cast<double>(m->GetCompass()) * 180.0 / M_PI, 0, 'f', 1),
                   true);
                 break;
               }
@@ -10123,7 +10123,7 @@ int main(int argc, char *argv[]) {
                   QString("[%1] ↯ %2  impulse=%3")
                     .arg(QTime::currentTime().toString("HH:mm:ss"))
                     .arg(otherName)
-                    .arg(std::sqrt(double(imp.x)*imp.x + double(imp.y)*imp.y + double(imp.z)*imp.z), 0, 'f', 1),
+                    .arg(std::sqrt(double(imp.x)*double(imp.x) + double(imp.y)*double(imp.y) + double(imp.z)*double(imp.z)), 0, 'f', 1),
                   false);
                 break;
               }
@@ -10376,8 +10376,8 @@ int main(int argc, char *argv[]) {
         if (!bp) continue;
 
         const SensorMountConfig mount = getOrCreateSensorMount(name);
-        cg::Location loc(mount.tx, mount.ty, mount.tz);
-        cg::Rotation rot(mount.ry, mount.rz, mount.rx);
+        cg::Location loc(static_cast<float>(mount.tx), static_cast<float>(mount.ty), static_cast<float>(mount.tz));
+        cg::Rotation rot(static_cast<float>(mount.ry), static_cast<float>(mount.rz), static_cast<float>(mount.rx));
         cg::Transform tr(loc, rot);
 
         for (int k = 0; k < counts[i]; ++k) {
@@ -11356,7 +11356,7 @@ int main(int argc, char *argv[]) {
             if (bp.ContainsAttribute("role_name")) {
               bp.SetAttribute("role_name", "scenario_traffic");
             }
-            auto actor = world.TrySpawnActor(bp, spawns[idx[i]]);
+            auto actor = world.TrySpawnActor(bp, spawns[idx[static_cast<size_t>(i)]]);
             if (!actor) continue;
             try {
               auto v = std::static_pointer_cast<cc::Vehicle>(actor);
@@ -11449,10 +11449,10 @@ int main(int argc, char *argv[]) {
       };
       for (const auto &pair : topology) {
         if (!pair.first || !pair.second) continue;
-        const auto l1 = pair.first->GetTransform().location;
-        const auto l2 = pair.second->GetTransform().location;
-        grow(l1.x, l1.y);
-        grow(l2.x, l2.y);
+        const auto loc1 = pair.first->GetTransform().location;
+        const auto loc2 = pair.second->GetTransform().location;
+        grow(loc1.x, loc1.y);
+        grow(loc2.x, loc2.y);
       }
       for (const auto &tr : spawns) {
         grow(tr.location.x, tr.location.y);
@@ -11466,9 +11466,9 @@ int main(int argc, char *argv[]) {
       topoPen.setWidthF(0);
       for (const auto &pair : topology) {
         if (!pair.first || !pair.second) continue;
-        const auto l1 = pair.first->GetTransform().location;
-        const auto l2 = pair.second->GetTransform().location;
-        previewScene->addLine(l1.x, -l1.y, l2.x, -l2.y, topoPen);
+        const auto loc1 = pair.first->GetTransform().location;
+        const auto loc2 = pair.second->GetTransform().location;
+        previewScene->addLine(loc1.x, -loc1.y, loc2.x, -loc2.y, topoPen);
       }
 
       const double r = std::max(1.5, (std::max(maxX - minX, maxY - minY)) / 300.0);
@@ -11476,7 +11476,7 @@ int main(int argc, char *argv[]) {
       spawnPen.setWidthF(0);
       QBrush spawnBrush(QColor(47, 166, 107, 200));
       for (const auto &tr : spawns) {
-        previewScene->addEllipse(tr.location.x - r, -tr.location.y - r,
+        previewScene->addEllipse(static_cast<double>(tr.location.x) - r, -static_cast<double>(tr.location.y) - r,
                                  2 * r, 2 * r, spawnPen, spawnBrush);
       }
 

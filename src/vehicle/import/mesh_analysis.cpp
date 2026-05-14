@@ -109,6 +109,30 @@ QString size_class_name(SizeClass s) {
   }
 }
 
+float detect_scale_to_cm_from_extent(float maxExt) {
+  if (maxExt <= 0.f) return 1.0f;
+  if (maxExt >= 2.0f   && maxExt <= 8.0f)    return 100.0f;
+  if (maxExt >= 200.0f && maxExt <= 800.0f)   return 1.0f;
+  if (maxExt >= 2000.0f && maxExt <= 8000.0f) return 0.1f;
+  if (maxExt >= 0.3f   && maxExt < 2.0f)     return 100.0f;
+  return 450.0f / maxExt;
+}
+
+float detect_scale_to_cm(const MeshGeometry &g) {
+  if (!g.valid || g.vertex_count() == 0) return 1.0f;
+  float xn = 1e30f, xx = -1e30f;
+  float yn = 1e30f, yx = -1e30f;
+  float zn = 1e30f, zx = -1e30f;
+  const int vc = g.vertex_count();
+  for (int i = 0; i < vc; ++i) {
+    float x, y, z; g.vertex(i, x, y, z);
+    xn = std::min(xn, x); xx = std::max(xx, x);
+    yn = std::min(yn, y); yx = std::max(yx, y);
+    zn = std::min(zn, z); zx = std::max(zx, z);
+  }
+  return detect_scale_to_cm_from_extent(std::max({xx - xn, yx - yn, zx - zn}));
+}
+
 MeshAnalysisResult analyze_mesh(const MeshGeometry &g, float scale_to_cm) {
   MeshAnalysisResult r;
   if (!g.valid || g.face_count() == 0) return r;
