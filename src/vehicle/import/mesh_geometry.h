@@ -16,11 +16,13 @@ namespace carla_studio::vehicle_import {
 struct MeshGeometry {
   bool valid = false;
   std::vector<float> verts;
+  std::vector<float> normals;
   std::vector<int>   faces;
   int  malformed_faces = 0;
 
   int  vertex_count() const { return static_cast<int>(verts.size() / 3); }
   int  face_count()   const { return static_cast<int>(faces.size() / 3); }
+  bool has_normals()  const { return !normals.empty() && normals.size() == verts.size(); }
   void vertex(int i, float &x, float &y, float &z) const {
     const size_t o = static_cast<size_t>(i) * 3;
     x = verts[o]; y = verts[o + 1]; z = verts[o + 2];
@@ -29,5 +31,7 @@ struct MeshGeometry {
 
 MeshGeometry load_mesh_geometry(const QString &path);
 MeshGeometry load_mesh_geometry_obj(const QString &path);
+
+void compute_smooth_normals(MeshGeometry &g);
 
 }

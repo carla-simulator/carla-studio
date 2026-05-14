@@ -56,6 +56,9 @@ struct MeshAnalysisResult {
 
 MeshAnalysisResult analyze_mesh(const MeshGeometry &g, float scale_to_cm);
 
+float detect_scale_to_cm(const MeshGeometry &g);
+float detect_scale_to_cm_from_extent(float maxExt);
+
 QString size_class_name(SizeClass s);
 
 SizeClass classify_by_name(const QString &filename_stem);

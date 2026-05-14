@@ -10,15 +10,22 @@
 
 #include <QFile>
 #include <QFileInfo>
+#include <QRegularExpression>
 #include <QTextStream>
+
+#include <algorithm>
+#include <cmath>
 
 namespace carla_studio::vehicle_import {
 
 namespace {
 
+static const QRegularExpression kWs(QStringLiteral("\\s+"));
+
 int parseFaceIndex(const QString &token, int vertex_count) {
   const qsizetype slash = token.indexOf(QLatin1Char('/'));
   const QString head = slash < 0 ? token : token.left(slash);
+  if (head.isEmpty()) return -1;
   bool ok = false;
   int idx = head.toInt(&ok);
   if (!ok) return -1;
@@ -27,6 +34,65 @@ int parseFaceIndex(const QString &token, int vertex_count) {
   return idx - 1;
 }
 
+static QString stripBom(const QString &s) {
+  if (!s.isEmpty() && s.at(0) == QChar(0xFEFF)) return s.mid(1);
+  return s;
+}
+
+}
+
+void compute_smooth_normals(MeshGeometry &g) {
+  const int nV = g.vertex_count();
+  const int nF = g.face_count();
+  if (nV == 0 || nF == 0) return;
+  g.normals.assign(static_cast<size_t>(nV) * 3, 0.0f);
+
+  for (int fi = 0; fi < nF; ++fi) {
+    const size_t fi3 = static_cast<size_t>(fi) * 3;
+    const int idx[3] = { g.faces[fi3], g.faces[fi3+1], g.faces[fi3+2] };
+    float p[3][3];
+    for (int k = 0; k < 3; ++k) g.vertex(idx[k], p[k][0], p[k][1], p[k][2]);
+
+    const float e01[3] = {p[1][0]-p[0][0], p[1][1]-p[0][1], p[1][2]-p[0][2]};
+    const float e02[3] = {p[2][0]-p[0][0], p[2][1]-p[0][1], p[2][2]-p[0][2]};
+    const float fn[3] = {
+      e01[1]*e02[2] - e01[2]*e02[1],
+      e01[2]*e02[0] - e01[0]*e02[2],
+      e01[0]*e02[1] - e01[1]*e02[0]
+    };
+    const float fnLen = std::sqrt(fn[0]*fn[0] + fn[1]*fn[1] + fn[2]*fn[2]);
+    if (fnLen < 1e-12f) continue;
+    const float fn_n[3] = {fn[0]/fnLen, fn[1]/fnLen, fn[2]/fnLen};
+
+    for (int k = 0; k < 3; ++k) {
+      const int prev = (k + 2) % 3, next = (k + 1) % 3;
+      float ep[3], en[3], lpSq = 0.f, lnSq = 0.f;
+      for (int d = 0; d < 3; ++d) {
+        ep[d] = p[prev][d] - p[k][d];
+        en[d] = p[next][d] - p[k][d];
+        lpSq += ep[d]*ep[d];
+        lnSq += en[d]*en[d];
+      }
+      const float lp = std::sqrt(lpSq), ln = std::sqrt(lnSq);
+      if (lp < 1e-12f || ln < 1e-12f) continue;
+      const float cosA = std::clamp(
+          (ep[0]*en[0] + ep[1]*en[1] + ep[2]*en[2]) / (lp * ln), -1.f, 1.f);
+      const float angle = std::acos(cosA);
+
+      const size_t o = static_cast<size_t>(idx[k]) * 3;
+      g.normals[o]   += fn_n[0] * angle;
+      g.normals[o+1] += fn_n[1] * angle;
+      g.normals[o+2] += fn_n[2] * angle;
+    }
+  }
+
+  for (int i = 0; i < nV; ++i) {
+    const size_t o = static_cast<size_t>(i) * 3;
+    const float L = std::sqrt(
+        g.normals[o]*g.normals[o] + g.normals[o+1]*g.normals[o+1] + g.normals[o+2]*g.normals[o+2]);
+    if (L > 1e-12f) { g.normals[o] /= L; g.normals[o+1] /= L; g.normals[o+2] /= L; }
+    else             { g.normals[o+2] = 1.f; }
+  }
 }
 
 MeshGeometry load_mesh_geometry_obj(const QString &path) {
@@ -34,11 +100,28 @@ MeshGeometry load_mesh_geometry_obj(const QString &path) {
   QFile f(path);
   if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) return g;
   QTextStream in(&f);
+
+  bool firstLine = true;
   while (!in.atEnd()) {
-    const QString line = in.readLine().trimmed();
+    QString line = in.readLine();
+
+    if (firstLine) { line = stripBom(line); firstLine = false; }
+
+    line = line.trimmed();
+
+    while (line.endsWith(QLatin1Char('\\')) && !in.atEnd()) {
+      line.chop(1);
+      line += QLatin1Char(' ');
+      line += in.readLine().trimmed();
+    }
+
     if (line.isEmpty() || line.startsWith(QLatin1Char('#'))) continue;
-    if (line.startsWith(QLatin1String("v "))) {
-      const QStringList tokens = line.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+
+    const QStringList tokens = line.split(kWs, Qt::SkipEmptyParts);
+    if (tokens.isEmpty()) continue;
+    const QString &cmd = tokens[0];
+
+    if (cmd == QLatin1String("v")) {
       if (tokens.size() < 4) continue;
       bool ok1, ok2, ok3;
       const float x = tokens[1].toFloat(&ok1);
@@ -46,8 +129,8 @@ MeshGeometry load_mesh_geometry_obj(const QString &path) {
       const float z = tokens[3].toFloat(&ok3);
       if (!(ok1 && ok2 && ok3)) continue;
       g.verts.push_back(x); g.verts.push_back(y); g.verts.push_back(z);
-    } else if (line.startsWith(QLatin1String("f "))) {
-      const QStringList tokens = line.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+
+    } else if (cmd == QLatin1String("f")) {
       if (tokens.size() < 4) { ++g.malformed_faces; continue; }
       const int vc = g.vertex_count();
       std::vector<int> ring;
@@ -66,7 +149,9 @@ MeshGeometry load_mesh_geometry_obj(const QString &path) {
       }
     }
   }
+
   g.valid = !g.verts.empty() && !g.faces.empty();
+  if (g.valid) compute_smooth_normals(g);
   return g;
 }
 

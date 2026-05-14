@@ -69,6 +69,56 @@ option (CARLA_STUDIO_FETCH_ASSIMP
         "Fetch + build Assimp at configure time for multi-format mesh ingest in CarlaStudio."
         OFF)
 
+if (DEFINED CARLA_DIR AND NOT DEFINED CARLA_BUILD_DIR)
+  set (CARLA_BUILD_DIR "${CARLA_DIR}/Build")
+endif ()
+
+if (DEFINED CARLA_BUILD_DIR AND NOT TARGET carla-client)
+  set (_cbd "${CARLA_BUILD_DIR}")
+  set (_libcarla_a "${_cbd}/LibCarla/libcarla-client.a")
+  if (NOT EXISTS "${_libcarla_a}")
+    carla_warning ("CARLA_BUILD_DIR=${_cbd}: libcarla-client.a not found; LibCarla disabled.")
+  else ()
+    get_filename_component (_carla_root "${_cbd}/.." ABSOLUTE)
+    set (_boost_src  "${_cbd}/_deps/boost-src")
+    set (_boost_bld  "${_cbd}/_deps/boost-build/libs")
+    set (_rpclib_src "${_cbd}/_deps/rpclib-src")
+    set (_rpclib_a   "${_cbd}/_deps/rpclib-build/librpc.a")
+    set (_png_a      "${_cbd}/_deps/libpng-build/libpng16.a")
+    set (_zlib_a     "${_cbd}/_deps/zlib-build/libz.a")
+
+    file (GLOB _boost_lib_incs "${_boost_src}/libs/*/include")
+    file (GLOB _boost_numeric_incs "${_boost_src}/libs/numeric/*/include")
+    file (GLOB _boost_compiled_libs "${_boost_bld}/*/libboost_*.a")
+
+    add_library (carla-client STATIC IMPORTED GLOBAL)
+    set_target_properties (carla-client PROPERTIES
+      IMPORTED_LOCATION "${_libcarla_a}"
+      INTERFACE_INCLUDE_DIRECTORIES
+        "${_carla_root}/LibCarla/source;${_boost_lib_incs};${_boost_numeric_incs};${_rpclib_src}/include;${_rpclib_src}/dependencies/include"
+      INTERFACE_COMPILE_DEFINITIONS
+        "BOOST_ATOMIC_NO_LIB;BOOST_ATOMIC_STATIC_LINK;\
+BOOST_CHRONO_NO_LIB;BOOST_CHRONO_STATIC_LINK;\
+BOOST_CONTAINER_NO_LIB;BOOST_CONTAINER_STATIC_LINK;\
+BOOST_COROUTINE_NO_LIB;BOOST_COROUTINE_STATIC_LINK;\
+BOOST_DATE_TIME_NO_LIB;BOOST_DATE_TIME_STATIC_LINK;\
+BOOST_FILESYSTEM_NO_LIB;BOOST_FILESYSTEM_STATIC_LINK=1;\
+BOOST_RANDOM_NO_LIB;BOOST_RANDOM_STATIC_LINK;\
+BOOST_SERIALIZATION_NO_LIB;BOOST_SERIALIZATION_STATIC_LINK;\
+BOOST_THREAD_NO_LIB;BOOST_THREAD_STATIC_LINK;BOOST_THREAD_USE_LIB;\
+LIBCARLA_IMAGE_SUPPORT_PNG=1;\
+RPCLIB_LINUX;RPCLIB_MSGPACK=clmdep_msgpack"
+      INTERFACE_LINK_LIBRARIES
+        "${_rpclib_a};${_boost_compiled_libs};\
+${_cbd}/_deps/recastnavigation-build/DetourCrowd/libDetourCrowd.a;\
+${_cbd}/_deps/recastnavigation-build/Detour/libDetour.a;\
+${_cbd}/_deps/recastnavigation-build/Recast/libRecast.a;\
+${_png_a};${_zlib_a}"
+    )
+    carla_message ("LibCarla integration enabled (CARLA_BUILD_DIR=${_cbd})")
+  endif ()
+endif ()
+
 if (CARLA_STUDIO_FETCH_ASSIMP)
   include (FetchContent)
   set (ASSIMP_BUILD_TESTS         OFF CACHE BOOL "" FORCE)
