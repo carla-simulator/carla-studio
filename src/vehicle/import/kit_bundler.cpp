@@ -39,8 +39,8 @@ QString render_kit_readme(const VehicleSpec &spec) {
   s << "| Field | Value |\n|---|---|\n";
   s << "| Name | `" << spec.name << "` |\n";
   s << "| Size class | `" << size_class_name(spec.size_class) << "` |\n";
-  s << "| Mass | " << QString::number(spec.mass, 'f', 0) << " kg |\n";
-  s << "| Suspension damping | " << QString::number(spec.susp_damping, 'f', 2) << " |\n";
+  s << "| Mass | " << QString::number(static_cast<double>(spec.mass), 'f', 0) << " kg |\n";
+  s << "| Suspension damping | " << QString::number(static_cast<double>(spec.susp_damping), 'f', 2) << " |\n";
   s << "| Torque-curve preset | `" << spec.torque_curve_tag << "` |\n";
   s << "| Chassis bbox (cm) | "
     << QString("X[%1..%2] Y[%3..%4] Z[%5..%6]")
@@ -58,11 +58,11 @@ QString render_kit_readme(const VehicleSpec &spec) {
   for (size_t i = 0; i < 4; ++i) {
     const WheelSpec &w = spec.wheels[i];
     s << "| " << names[i] << " | "
-      << QString::number(w.x, 'f', 1) << " | "
-      << QString::number(w.y, 'f', 1) << " | "
-      << QString::number(w.z, 'f', 1) << " | "
-      << QString::number(w.radius, 'f', 1) << " | "
-      << QString::number(w.width, 'f', 1) << " |\n";
+      << QString::number(static_cast<double>(w.x), 'f', 1) << " | "
+      << QString::number(static_cast<double>(w.y), 'f', 1) << " | "
+      << QString::number(static_cast<double>(w.z), 'f', 1) << " | "
+      << QString::number(static_cast<double>(w.radius), 'f', 1) << " | "
+      << QString::number(static_cast<double>(w.width), 'f', 1) << " |\n";
   }
   return out;
 }

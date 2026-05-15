@@ -87,7 +87,7 @@ void ViewGizmo::redraw()
   const int cy = H / 2;
   const int R  = 43;
 
-  QRadialGradient bg(cx - 10, cy - 10, R * 1.3f);
+  QRadialGradient bg(cx - 10, cy - 10, static_cast<qreal>(R * 1.3f));
   bg.setColorAt(0, QColor(72, 74, 86));
   bg.setColorAt(1, QColor(22, 23, 28));
   p.setPen(Qt::NoPen);

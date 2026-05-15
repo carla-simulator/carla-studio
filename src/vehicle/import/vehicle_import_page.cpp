@@ -177,7 +177,7 @@ VehicleImportPage::VehicleImportPage(EditorBinaryResolver find_editor,
       pl->setAlignment(Qt::AlignCenter);
       pl->setContentsMargins(firstInRow ? 0 : 10, 0, 4, 0);
       auto *sb = new QDoubleSpinBox();
-      sb->setRange(lo, hi);
+      sb->setRange(static_cast<double>(lo), static_cast<double>(hi));
       sb->setDecimals(1);
       sb->setSingleStep(0.5);
       sb->setFixedWidth(88);
@@ -489,8 +489,8 @@ void VehicleImportPage::recompute_merged_spec() {
   }
   *m_detected_spec = mr.spec;
   const auto applyRowFromWheel = [](WheelSpinRow &row, const WheelSpec &w) {
-    row.x->setValue(w.x); row.y->setValue(w.y);
-    row.z->setValue(w.z); row.r->setValue(w.radius);
+    row.x->setValue(static_cast<double>(w.x)); row.y->setValue(static_cast<double>(w.y));
+    row.z->setValue(static_cast<double>(w.z)); row.r->setValue(static_cast<double>(w.radius));
   };
   applyRowFromWheel(m_row_fl, m_detected_spec->wheels[0]);
   applyRowFromWheel(m_row_fr, m_detected_spec->wheels[1]);
@@ -870,8 +870,8 @@ void VehicleImportPage::load_mesh_from_path(const QString &path) {
                                                path, bb.scale_to_cm,
                                                bb.up_axis, bb.forward_axis);
         const auto applyRowFromWheel = [](WheelSpinRow &row, const WheelSpec &w) {
-          row.x->setValue(w.x); row.y->setValue(w.y);
-          row.z->setValue(w.z); row.r->setValue(w.radius);
+          row.x->setValue(static_cast<double>(w.x)); row.y->setValue(static_cast<double>(w.y));
+          row.z->setValue(static_cast<double>(w.z)); row.r->setValue(static_cast<double>(w.radius));
         };
         applyRowFromWheel(m_row_fl, m_detected_spec->wheels[0]);
         applyRowFromWheel(m_row_fr, m_detected_spec->wheels[1]);
@@ -881,18 +881,18 @@ void VehicleImportPage::load_mesh_from_path(const QString &path) {
         const SizeClass nameHint = classify_by_name(QFileInfo(path).completeBaseName());
         if (nameHint != SizeClass::Unknown) effClass = nameHint;
         const SizePreset preset = preset_for_size_class(effClass);
-        m_mass_spin->setValue(preset.mass);
-        m_steer_spin->setValue(preset.max_steer_angle);
-        m_brake_spin->setValue(preset.max_brake_torque);
-        m_susp_raise_spin->setValue(preset.susp_max_raise);
-        m_susp_drop_spin->setValue(preset.susp_max_drop);
-        m_susp_damp_spin->setValue(preset.susp_damping);
+        m_mass_spin->setValue(static_cast<double>(preset.mass));
+        m_steer_spin->setValue(static_cast<double>(preset.max_steer_angle));
+        m_brake_spin->setValue(static_cast<double>(preset.max_brake_torque));
+        m_susp_raise_spin->setValue(static_cast<double>(preset.susp_max_raise));
+        m_susp_drop_spin->setValue(static_cast<double>(preset.susp_max_drop));
+        m_susp_damp_spin->setValue(static_cast<double>(preset.susp_damping));
         QStringList parts;
-        parts << QString("4 wheels (%1 cm radius)").arg(m_detected_spec->wheels[0].radius, 0, 'f', 1);
+        parts << QString("4 wheels (%1 cm radius)").arg(static_cast<double>(m_detected_spec->wheels[0].radius), 0, 'f', 1);
         parts << QString("size class: %1%2")
                   .arg(size_class_name(effClass),
                        nameHint != SizeClass::Unknown ? " (filename hint)" : "");
-        parts << QString("mass %1 kg").arg(preset.mass, 0, 'f', 0);
+        parts << QString("mass %1 kg").arg(static_cast<double>(preset.mass), 0, 'f', 0);
         parts << QString("torque `%1`").arg(preset.torque_curve_tag);
         if (m_detected_spec->small_vehicle_needs_wheel_shape)
           parts << "small-WheelShape applied (Chaos < 18 cm fix)";
@@ -904,8 +904,8 @@ void VehicleImportPage::load_mesh_from_path(const QString &path) {
   if (!mesh_driven) {
     const auto wheels = guessWheels(xLo, xHi, yLo, yHi, zLo, zHi);
     const auto applyRowFromGuess = [](WheelSpinRow &r, const WheelGuess &w) {
-      r.x->setValue(w.x); r.y->setValue(w.y);
-      r.z->setValue(w.z); r.r->setValue(w.radius);
+      r.x->setValue(static_cast<double>(w.x)); r.y->setValue(static_cast<double>(w.y));
+      r.z->setValue(static_cast<double>(w.z)); r.r->setValue(static_cast<double>(w.radius));
     };
     applyRowFromGuess(m_row_fl, wheels[0]);
     applyRowFromGuess(m_row_fr, wheels[1]);
@@ -951,29 +951,29 @@ QJsonObject VehicleImportPage::build_import_spec(const QString &mesh_path_to_sen
   spec["mesh_path"]       = mesh_path_to_send;
   spec["content_path"]    = m_content_path_edit->text().trimmed();
   spec["base_vehicle_bp"] = m_base_vehicle_bp_edit->text().trimmed();
-  spec["mass"]            = m_mass_spin->value();
-  spec["susp_damping"]    = m_susp_damp_spin->value();
+  spec["mass"]            = static_cast<double>(m_mass_spin->value());
+  spec["susp_damping"]    = static_cast<double>(m_susp_damp_spin->value());
   if (*m_aabb_valid) {
-    spec["source_scale_to_cm"]  = *m_scale_to_cm;
-    spec["source_up_axis"]      = *m_up_axis;
-    spec["source_forward_axis"] = *m_forward_axis;
+    spec["source_scale_to_cm"]  = static_cast<double>(*m_scale_to_cm);
+    spec["source_up_axis"]      = static_cast<double>(*m_up_axis);
+    spec["source_forward_axis"] = static_cast<double>(*m_forward_axis);
   }
-  spec["wheel_fl"] = wheelObj(m_row_fl, m_steer_spin->value(), m_brake_spin->value(),
-                              m_susp_raise_spin->value(), m_susp_drop_spin->value());
-  spec["wheel_fr"] = wheelObj(m_row_fr, m_steer_spin->value(), m_brake_spin->value(),
-                              m_susp_raise_spin->value(), m_susp_drop_spin->value());
-  spec["wheel_rl"] = wheelObj(m_row_rl, 0.0,                  m_brake_spin->value(),
-                              m_susp_raise_spin->value(), m_susp_drop_spin->value());
-  spec["wheel_rr"] = wheelObj(m_row_rr, 0.0,                  m_brake_spin->value(),
-                              m_susp_raise_spin->value(), m_susp_drop_spin->value());
+  spec["wheel_fl"] = wheelObj(m_row_fl, static_cast<double>(m_steer_spin->value()), static_cast<double>(m_brake_spin->value()),
+                              static_cast<double>(m_susp_raise_spin->value()), static_cast<double>(m_susp_drop_spin->value()));
+  spec["wheel_fr"] = wheelObj(m_row_fr, static_cast<double>(m_steer_spin->value()), static_cast<double>(m_brake_spin->value()),
+                              static_cast<double>(m_susp_raise_spin->value()), static_cast<double>(m_susp_drop_spin->value()));
+  spec["wheel_rl"] = wheelObj(m_row_rl, 0.0,                  static_cast<double>(m_brake_spin->value()),
+                              static_cast<double>(m_susp_raise_spin->value()), static_cast<double>(m_susp_drop_spin->value()));
+  spec["wheel_rr"] = wheelObj(m_row_rr, 0.0,                  static_cast<double>(m_brake_spin->value()),
+                              static_cast<double>(m_susp_raise_spin->value()), static_cast<double>(m_susp_drop_spin->value()));
   if (m_detected_spec && m_detected_spec->detected_from_mesh) {
     QJsonObject chassis;
-    chassis["x_min"] = m_detected_spec->chassis_x_min;
-    chassis["x_max"] = m_detected_spec->chassis_x_max;
-    chassis["y_min"] = m_detected_spec->chassis_y_min;
-    chassis["y_max"] = m_detected_spec->chassis_y_max;
-    chassis["z_min"] = m_detected_spec->chassis_z_min;
-    chassis["z_max"] = m_detected_spec->chassis_z_max;
+    chassis["x_min"] = static_cast<double>(m_detected_spec->chassis_x_min);
+    chassis["x_max"] = static_cast<double>(m_detected_spec->chassis_x_max);
+    chassis["y_min"] = static_cast<double>(m_detected_spec->chassis_y_min);
+    chassis["y_max"] = static_cast<double>(m_detected_spec->chassis_y_max);
+    chassis["z_min"] = static_cast<double>(m_detected_spec->chassis_z_min);
+    chassis["z_max"] = static_cast<double>(m_detected_spec->chassis_z_max);
     spec["chassis_aabb_cm"] = chassis;
   }
   return spec;

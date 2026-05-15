@@ -68,6 +68,9 @@
 #include <QJsonParseError>
 #include <QSet>
 #include <QSettings>
+#include <QPointer>
+#include <QGuiApplication>
+#include <QStyleHints>
 #include <chrono>
 #include <thread>
 #include <QPalette>
@@ -182,7 +185,7 @@ protected:
         p.drawPolygon(fill);
 
         // Stroke
-        QPen pen(m_color, 1.5f, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+        QPen pen(m_color, static_cast<qreal>(1.5f), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
         p.setBrush(Qt::NoBrush);
         p.setPen(pen);
         p.drawPolyline(poly);
@@ -839,6 +842,7 @@ private:
 };
 
 static void carla_studio_signal_trace(int sig) {
+#ifdef __linux__
   void *frames[64];
   const int n = backtrace(frames, 64);
   const int fd = open("/tmp/carla_studio_crash.log",
@@ -852,6 +856,7 @@ static void carla_studio_signal_trace(int sig) {
     backtrace_symbols_fd(frames, n, fd);
     close(fd);
   }
+#endif
   std::signal(sig, SIG_DFL);
   std::raise(sig);
 }
@@ -2271,12 +2276,12 @@ int main(int argc, char *argv[]) {
   bool l1Pressed = false, r1Pressed = false;
   bool l3Pressed = false, r3Pressed = false;
   bool dpadUpPressed = false, dpadDownPressed = false, dpadLeftPressed = false, dpadRightPressed = false;
-  int jsFd = -1;
+  [[maybe_unused]] int jsFd = -1;
   QString jsName;
   std::vector<QWidget *> joystickMirrorWindows;
   std::vector<QLabel *> joystickMirrorTelemetryLabels;
 
-  auto scanJoystickDevices = [&]() -> QStringList {
+  [[maybe_unused]] auto scanJoystickDevices = [&]() -> QStringList {
     QStringList names;
 #ifdef CARLA_STUDIO_HAS_LINUX_JOYSTICK
     for (int index = 0; index < 8; ++index) {
@@ -2297,7 +2302,7 @@ int main(int argc, char *argv[]) {
     return names;
   };
 
-  auto rebuildJoystickMirrorWindows = [&](const QStringList &allJoysticks) {
+  [[maybe_unused]] auto rebuildJoystickMirrorWindows = [&](const QStringList &allJoysticks) {
     for (QWidget *windowPtr : joystickMirrorWindows) {
       if (windowPtr) {
         windowPtr->close();
@@ -4444,7 +4449,7 @@ int main(int argc, char *argv[]) {
         }
       }
 
-      QTimer::singleShot(launchDelayMs, &window, [=, &window]() {
+      QTimer::singleShot(launchDelayMs, &window, [=]() {
         launchSelectedDriverMode(rootPath, target, launchPort, scenarioName);
       });
 
@@ -4503,7 +4508,7 @@ int main(int argc, char *argv[]) {
     } else {
     }
 
-    QTimer::singleShot(1500, &window, [=, &window]() {
+    QTimer::singleShot(1500, &window, [=]() {
       int detectedPort = scanCarlaPort();
       if (detectedPort > 0) {
         portSpin->setValue(detectedPort);
@@ -8465,7 +8470,7 @@ int main(int argc, char *argv[]) {
   applyL5InputLockout(saeBtnGroup->checkedId());
 
   if (l1LaneKeepBtn && l1AccBtn) {
-    auto onL1FeaturePicked = [&, l1LaneKeepBtn, l1AccBtn]() {
+    auto onL1FeaturePicked = [&, l1LaneKeepBtn]() {
       l1FeatureIsLaneKeep = l1LaneKeepBtn->isChecked();
       QSettings().setValue("actuate/sae_l1_feature",
                            l1FeatureIsLaneKeep ? "lanekeep" : "acc");
@@ -11037,7 +11042,7 @@ int main(int argc, char *argv[]) {
 #endif
   });
 
-  QObject::connect(mapLoadBtn, &QPushButton::clicked, &window, [&, scenarioLogLine]() {
+  QObject::connect(mapLoadBtn, &QPushButton::clicked, &window, [&]() {
 #ifdef CARLA_STUDIO_WITH_LIBCARLA
     const QString m = mapCombo->currentText();
     if (m.isEmpty() || m.startsWith("(")) {
@@ -11055,7 +11060,7 @@ int main(int argc, char *argv[]) {
 #endif
   });
 
-  QObject::connect(mapReloadBtn, &QPushButton::clicked, &window, [&, scenarioLogLine]() {
+  QObject::connect(mapReloadBtn, &QPushButton::clicked, &window, [&]() {
 #ifdef CARLA_STUDIO_WITH_LIBCARLA
     auto c = scenarioConnectClient();
     if (!c) return;
@@ -11107,7 +11112,7 @@ int main(int argc, char *argv[]) {
     }
   });
 
-  QObject::connect(xodrImportBtn, &QPushButton::clicked, &window, [&, scenarioLogLine]() {
+  QObject::connect(xodrImportBtn, &QPushButton::clicked, &window, [&]() {
 #ifdef CARLA_STUDIO_WITH_LIBCARLA
     const QString path = xodrPath->text().trimmed();
     if (path.isEmpty()) { scenarioLogLine("✗ no XODR file selected"); return; }
@@ -11129,7 +11134,7 @@ int main(int argc, char *argv[]) {
 #endif
   });
 
-  QObject::connect(xodrExportBtn, &QPushButton::clicked, &window, [&, scenarioLogLine]() {
+  QObject::connect(xodrExportBtn, &QPushButton::clicked, &window, [&]() {
 #ifdef CARLA_STUDIO_WITH_LIBCARLA
     auto c = scenarioConnectClient();
     if (!c) return;
