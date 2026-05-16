@@ -521,8 +521,8 @@ void CalibrationScene::rebuild_target_entities() {
 void CalibrationScene::on_ground_clicked(Qt3DRender::QPickEvent *ev) {
   if (!ev) return;
   const QVector3D w = ev->worldIntersection();
-  const double xWorld = -w.z();
-  const double yWorld =  w.x();
+  const double xWorld = -static_cast<double>(w.z());
+  const double yWorld =  static_cast<double>(w.x());
   add_target_at(m_next_drop_type, xWorld, yWorld);
 }
 

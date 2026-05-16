@@ -11,6 +11,7 @@
 #include <QString>
 #include <QStringList>
 #include <QTextStream>
+#include <QSet>
 
 #include <signal.h>
 #include <sys/types.h>

@@ -11,6 +11,7 @@ else ()
   add_compile_options (
     -Wall -Wextra -Werror
     -Wno-unused-result -Wno-missing-field-initializers
+    -Wno-c++20-extensions
     -Wshadow -Wconversion -Wsign-conversion
     -Wdouble-promotion -Wundef -Wnull-dereference -Wformat=2
     -fstack-protector-all
@@ -29,8 +30,10 @@ else ()
       -Wl,-z,noexecstack
     )
   endif ()
-  add_compile_options (-fstack-clash-protection)
-  if (CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|i[3-9]86)$")
+  if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_compile_options (-fstack-clash-protection)
+  endif ()
+  if (CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|i[3-9]86)$" AND NOT APPLE)
     add_compile_options (-fcf-protection=full)
   endif ()
 endif ()

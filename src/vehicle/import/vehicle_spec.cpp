@@ -103,13 +103,13 @@ namespace {
 
 QJsonObject wheel_to_json(const WheelSpec &w) {
   QJsonObject o;
-  o["x"] = w.x; o["y"] = w.y; o["z"] = w.z;
-  o["radius"] = w.radius;
-  o["width"]  = w.width;
-  o["max_steer_angle"]  = w.max_steer_angle;
-  o["max_brake_torque"] = w.max_brake_torque;
-  o["susp_max_raise"]   = w.susp_max_raise;
-  o["susp_max_drop"]    = w.susp_max_drop;
+  o["x"] = static_cast<double>(w.x); o["y"] = static_cast<double>(w.y); o["z"] = static_cast<double>(w.z);
+  o["radius"] = static_cast<double>(w.radius);
+  o["width"]  = static_cast<double>(w.width);
+  o["max_steer_angle"]  = static_cast<double>(w.max_steer_angle);
+  o["max_brake_torque"] = static_cast<double>(w.max_brake_torque);
+  o["susp_max_raise"]   = static_cast<double>(w.susp_max_raise);
+  o["susp_max_drop"]    = static_cast<double>(w.susp_max_drop);
   return o;
 }
 
@@ -121,32 +121,32 @@ QJsonObject spec_to_json(const VehicleSpec &s) {
   o["mesh_path"]       = s.mesh_path;
   o["content_path"]    = s.content_path;
   o["base_vehicle_bp"] = s.base_vehicle_bp;
-  o["mass"]            = s.mass;
-  o["susp_damping"]    = s.susp_damping;
+  o["mass"]            = static_cast<double>(s.mass);
+  o["susp_damping"]    = static_cast<double>(s.susp_damping);
   o["torque_curve_tag"] = s.torque_curve_tag;
   o["size_class"]      = size_class_name(s.size_class);
   o["small_vehicle_needs_wheelshape"] = s.small_vehicle_needs_wheel_shape;
   o["has_four_wheels"] = s.has_four_wheels;
   o["detected_from_mesh"] = s.detected_from_mesh;
-  o["source_scale_to_cm"]  = s.scale_to_cm;
+  o["source_scale_to_cm"]  = static_cast<double>(s.scale_to_cm);
   o["source_up_axis"]      = s.up_axis;
   o["source_forward_axis"] = s.forward_axis;
-  o["adjust_yaw_deg"]      = s.adjust_yaw_deg;
-  o["adjust_mirror_x"]     = s.adjust_mirror_x;
-  o["adjust_mirror_y"]     = s.adjust_mirror_y;
+  o["adjust_yaw_deg"]      = static_cast<double>(s.adjust_yaw_deg);
+  o["adjust_mirror_x"]     = static_cast<double>(s.adjust_mirror_x);
+  o["adjust_mirror_y"]     = static_cast<double>(s.adjust_mirror_y);
   o["wheel_fl"] = wheel_to_json(s.wheels[0]);
   o["wheel_fr"] = wheel_to_json(s.wheels[1]);
   o["wheel_rl"] = wheel_to_json(s.wheels[2]);
   o["wheel_rr"] = wheel_to_json(s.wheels[3]);
   QJsonObject chassis;
-  chassis["x_min"] = s.chassis_x_min; chassis["x_max"] = s.chassis_x_max;
-  chassis["y_min"] = s.chassis_y_min; chassis["y_max"] = s.chassis_y_max;
-  chassis["z_min"] = s.chassis_z_min; chassis["z_max"] = s.chassis_z_max;
+  chassis["x_min"] = static_cast<double>(s.chassis_x_min); chassis["x_max"] = static_cast<double>(s.chassis_x_max);
+  chassis["y_min"] = static_cast<double>(s.chassis_y_min); chassis["y_max"] = static_cast<double>(s.chassis_y_max);
+  chassis["z_min"] = static_cast<double>(s.chassis_z_min); chassis["z_max"] = static_cast<double>(s.chassis_z_max);
   o["chassis_aabb_cm"] = chassis;
   QJsonObject overall;
-  overall["x_min"] = s.overall_x_min; overall["x_max"] = s.overall_x_max;
-  overall["y_min"] = s.overall_y_min; overall["y_max"] = s.overall_y_max;
-  overall["z_min"] = s.overall_z_min; overall["z_max"] = s.overall_z_max;
+  overall["x_min"] = static_cast<double>(s.overall_x_min); overall["x_max"] = static_cast<double>(s.overall_x_max);
+  overall["y_min"] = static_cast<double>(s.overall_y_min); overall["y_max"] = static_cast<double>(s.overall_y_max);
+  overall["z_min"] = static_cast<double>(s.overall_z_min); overall["z_max"] = static_cast<double>(s.overall_z_max);
   o["overall_aabb_cm"] = overall;
   return o;
 }

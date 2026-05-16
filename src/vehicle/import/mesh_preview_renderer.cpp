@@ -185,8 +185,8 @@ QImage render_preview(const MeshGeometry &g,
     int axis = (which == 'X') ? 0 : (which == 'Y') ? 1 : 2;
     const float len = half_cm * 0.55f;
     QPointF tip_world;
-    if (axis == hAxis)      tip_world = QPointF(len, 0);
-    else if (axis == vAxis) tip_world = QPointF(0, len);
+    if (axis == hAxis)      tip_world = QPointF(static_cast<qreal>(len), 0);
+    else if (axis == vAxis) tip_world = QPointF(0, static_cast<qreal>(len));
     else return;
     QPointF tip = world_to_img(static_cast<float>(tip_world.x()), static_cast<float>(tip_world.y()));
     QPointF base = center;
@@ -214,7 +214,7 @@ QImage render_preview(const MeshGeometry &g,
     int fa = sum.forward_axis;
     if (fa == hAxis || fa == vAxis) {
       const float len = half_cm * 0.7f * static_cast<float>(sum.forward_sign);
-      QPointF tipW = (fa == hAxis) ? QPointF(len, 0) : QPointF(0, len);
+      QPointF tipW = (fa == hAxis) ? QPointF(static_cast<qreal>(len), 0) : QPointF(0, static_cast<qreal>(len));
       QPointF tip = world_to_img(static_cast<float>(tipW.x()), static_cast<float>(tipW.y()));
       p.setPen(QPen(QColor(255, 80, 0), 4, Qt::DashLine));
       p.drawLine(center, tip);

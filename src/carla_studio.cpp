@@ -68,6 +68,9 @@
 #include <QJsonParseError>
 #include <QSet>
 #include <QSettings>
+#include <QPointer>
+#include <QGuiApplication>
+#include <QStyleHints>
 #include <chrono>
 #include <thread>
 #include <QPalette>
@@ -182,7 +185,7 @@ protected:
         p.drawPolygon(fill);
 
         // Stroke
-        QPen pen(m_color, 1.5f, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+        QPen pen(m_color, static_cast<qreal>(1.5f), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
         p.setBrush(Qt::NoBrush);
         p.setPen(pen);
         p.drawPolyline(poly);
@@ -839,6 +842,7 @@ private:
 };
 
 static void carla_studio_signal_trace(int sig) {
+#ifdef __linux__
   void *frames[64];
   const int n = backtrace(frames, 64);
   const int fd = open("/tmp/carla_studio_crash.log",
@@ -852,6 +856,7 @@ static void carla_studio_signal_trace(int sig) {
     backtrace_symbols_fd(frames, n, fd);
     close(fd);
   }
+#endif
   std::signal(sig, SIG_DFL);
   std::raise(sig);
 }
@@ -2271,12 +2276,12 @@ int main(int argc, char *argv[]) {
   bool l1Pressed = false, r1Pressed = false;
   bool l3Pressed = false, r3Pressed = false;
   bool dpadUpPressed = false, dpadDownPressed = false, dpadLeftPressed = false, dpadRightPressed = false;
-  int jsFd = -1;
+  [[maybe_unused]] int jsFd = -1;
   QString jsName;
   std::vector<QWidget *> joystickMirrorWindows;
   std::vector<QLabel *> joystickMirrorTelemetryLabels;
 
-  auto scanJoystickDevices = [&]() -> QStringList {
+  [[maybe_unused]] auto scanJoystickDevices = [&]() -> QStringList {
     QStringList names;
 #ifdef CARLA_STUDIO_HAS_LINUX_JOYSTICK
     for (int index = 0; index < 8; ++index) {
@@ -2297,7 +2302,7 @@ int main(int argc, char *argv[]) {
     return names;
   };
 
-  auto rebuildJoystickMirrorWindows = [&](const QStringList &allJoysticks) {
+  [[maybe_unused]] auto rebuildJoystickMirrorWindows = [&](const QStringList &allJoysticks) {
     for (QWidget *windowPtr : joystickMirrorWindows) {
       if (windowPtr) {
         windowPtr->close();
@@ -2903,7 +2908,6 @@ int main(int argc, char *argv[]) {
 
   refreshProcessList = [&]() {
 
-    discoverCarlaSimPids();
     totalCpuBar->setValue(0);
     totalMemBar->setValue(0);
     totalGpuBar->setValue(0);
@@ -2989,9 +2993,26 @@ int main(int argc, char *argv[]) {
     }
 #endif
 
+    static QMap<qint64, qint64> s_prev_jiffies;
+    static qint64 s_prev_ts_ms = 0;
+    const qint64 now_ms = QDateTime::currentMSecsSinceEpoch();
+    const int clk_tck = carla_studio_proc::proc_clk_tck();
+    QMap<qint64, double> delta_cpu_pct;
+    for (qint64 pid : trackedCarlaPids) {
+      const qint64 j = carla_studio_proc::proc_cpu_jiffies(pid);
+      if (j >= 0 && s_prev_jiffies.contains(pid) && s_prev_ts_ms > 0) {
+        const qint64 dj  = j - s_prev_jiffies.value(pid);
+        const qint64 dms = now_ms - s_prev_ts_ms;
+        if (dms > 0 && clk_tck > 0)
+          delta_cpu_pct[pid] = static_cast<double>(dj) / clk_tck * 1000.0 / static_cast<double>(dms) * 100.0;
+      }
+      if (j >= 0) s_prev_jiffies[pid] = j;
+    }
+    s_prev_ts_ms = now_ms;
+
     QProcess proc;
     proc.start("/bin/bash", QStringList() << "-lc"
-      << QString("ps -p %1 -o pid=,pcpu=,pmem=,rss=,comm= --sort=-pcpu").arg(pidCsv));
+      << QString("ps -p %1 -o pid=,pmem=,rss=,comm= --sort=-rss").arg(pidCsv));
     proc.waitForFinished(2000);
     const QString output = QString::fromLocal8Bit(proc.readAllStandardOutput());
     const QStringList lines = output.split('\n', Qt::SkipEmptyParts);
@@ -3040,18 +3061,18 @@ int main(int argc, char *argv[]) {
     int row = 0;
     for (const QString &line : lines) {
       const QStringList parts = line.trimmed().split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
-      if (parts.size() < 5) {
+      if (parts.size() < 4) {
         continue;
       }
       bool pidOk = false;
-      bool cpuOk = false;
       bool memOk = false;
       bool rssOk = false;
       const qint64 pid     = parts[0].toLongLong(&pidOk);
-      const double cpu     = parts[1].toDouble(&cpuOk);
-      const double mem     = parts[2].toDouble(&memOk);
-      const qint64 rssKib  = parts[3].toLongLong(&rssOk);
-      const QString processName = parts[4];
+      const double cpu     = pidOk ? delta_cpu_pct.value(pid, -1.0) : -1.0;
+      const bool cpuOk     = cpu >= 0.0;
+      const double mem     = parts[1].toDouble(&memOk);
+      const qint64 rssKib  = parts[2].toLongLong(&rssOk);
+      const QString processName = parts[3];
       const double rssMiB  = static_cast<double>(rssKib) / 1024.0;
 
       static const std::array<std::pair<const char *, const char *>, 13> kPrettyProcs = {{
@@ -3095,17 +3116,15 @@ int main(int argc, char *argv[]) {
                       memOk));
 
       const bool hasSm   = pidOk && gpuByPid.contains(pid);
-      const bool hasVram = pidOk && gpuMemPctByPid.contains(pid);
+      const bool hasVram = pidOk && gpuMemMiBByPid.contains(pid);
       const bool hasGpu  = hasSm || hasVram;
-      const double gpuPct = hasSm ? gpuByPid.value(pid)
-                          : hasVram ? gpuMemPctByPid.value(pid)
-                          : 0.0;
+      const double gpuPct = hasSm ? gpuByPid.value(pid) : 0.0;
       const qint64 gpuMib = pidOk ? gpuMemMiBByPid.value(pid, 0) : 0;
       if (hasGpu) {
         carla_process_table->setCellWidget(row, 4,
           makeMetricBar(gpuPct,
                         gpuMib > 0 ? QString("%1 MiB").arg(gpuMib) : QStringLiteral(""),
-                        true));
+                        hasSm));
       } else {
         carla_process_table->setCellWidget(row, 4, makeMetricBar(0.0, "", false));
       }
@@ -3114,7 +3133,7 @@ int main(int argc, char *argv[]) {
       if (memOk)           totalMem    += mem;
       if (memOk && rssOk)  totalMemMiB += rssMiB;
       if (hasGpu) {
-        totalGpu    += gpuPct;
+        if (hasSm) totalGpu += gpuPct;
         totalGpuMiB += double(gpuMib);
         gpuRows     += 1;
       }
@@ -4430,7 +4449,7 @@ int main(int argc, char *argv[]) {
         }
       }
 
-      QTimer::singleShot(launchDelayMs, &window, [=, &window]() {
+      QTimer::singleShot(launchDelayMs, &window, [=]() {
         launchSelectedDriverMode(rootPath, target, launchPort, scenarioName);
       });
 
@@ -4489,7 +4508,7 @@ int main(int argc, char *argv[]) {
     } else {
     }
 
-    QTimer::singleShot(1500, &window, [=, &window]() {
+    QTimer::singleShot(1500, &window, [=]() {
       int detectedPort = scanCarlaPort();
       if (detectedPort > 0) {
         portSpin->setValue(detectedPort);
@@ -8451,7 +8470,7 @@ int main(int argc, char *argv[]) {
   applyL5InputLockout(saeBtnGroup->checkedId());
 
   if (l1LaneKeepBtn && l1AccBtn) {
-    auto onL1FeaturePicked = [&, l1LaneKeepBtn, l1AccBtn]() {
+    auto onL1FeaturePicked = [&, l1LaneKeepBtn]() {
       l1FeatureIsLaneKeep = l1LaneKeepBtn->isChecked();
       QSettings().setValue("actuate/sae_l1_feature",
                            l1FeatureIsLaneKeep ? "lanekeep" : "acc");
@@ -9618,23 +9637,36 @@ int main(int argc, char *argv[]) {
       countLabel->setText(QString("×%1").arg(totalCount));
     };
 
+    auto ensure_default_name = [](const QString &sn, int idx) {
+      const QString key = QString("sensor/displayname/%1").arg(sensor_mount_key(sn, idx));
+      QSettings settings;
+      if (settings.value(key).toString().isEmpty()) {
+        QString base = sn.toLower().replace(' ', '_').replace('-', '_');
+        settings.setValue(key, QString("sensor_%1_%2").arg(base).arg(idx));
+      }
+    };
+
     for (size_t i = 0; i < checks.size(); ++i) {
       QCheckBox *check = checks[i];
       QPushButton *gear = gears[i];
       QPushButton *plus = pluses[i];
       QLabel *sensor_count_label = sensor_count_labels[i];
-      QObject::connect(check, &QCheckBox::toggled, &window, [&, i, gear, sensor_count_label, updateCategoryCount](bool checked) {
+      QObject::connect(check, &QCheckBox::toggled, &window, [&, i, gear, sensor_count_label, updateCategoryCount, ensure_default_name](bool checked) {
         gear->setEnabled(checked);
         sensor_count_label->setText(QString("x%1").arg(checked ? sensor_counts[i] : 0));
         const QString sn = checks[i]->property("sensor_name").toString();
         sensor_instance_count[sn] = checked ? sensor_counts[i] : 0;
+        if (checked) {
+          for (int j = 1; j <= sensor_counts[i]; ++j) ensure_default_name(sn, j);
+        }
         updateCategoryCount();
       });
-      QObject::connect(plus, &QPushButton::clicked, &window, [&, i, check, sensor_count_label, updateCategoryCount]() {
+      QObject::connect(plus, &QPushButton::clicked, &window, [&, i, check, sensor_count_label, updateCategoryCount, ensure_default_name]() {
         sensor_counts[i] += 1;
         const QString sn = check->property("sensor_name").toString();
         sensor_mount_configs[sensor_mount_key(sn, sensor_counts[i])] = frontCenterMountForFrame("Rear Baselink");
         sensor_instance_count[sn] = sensor_counts[i];
+        ensure_default_name(sn, sensor_counts[i]);
         if (!check->isChecked()) {
           check->setChecked(true);
         }
@@ -10273,7 +10305,7 @@ int main(int argc, char *argv[]) {
     auto collectChecked = [&](const std::vector<QCheckBox *> &checks) {
       for (QCheckBox *check : checks) {
         if (check && check->isChecked()) {
-          selected << check->text();
+          selected << check->property("sensor_name").toString();
         }
       }
     };
@@ -10368,7 +10400,7 @@ int main(int argc, char *argv[]) {
       for (size_t i = 0; i < checks.size(); ++i) {
         if (!checks[i] || !checks[i]->isChecked()) continue;
         if (counts[i] <= 0) continue;
-        const QString name = checks[i]->text();
+        const QString name = checks[i]->property("sensor_name").toString();
         const auto descIt = kSensorCatalog.find(name);
         if (descIt == kSensorCatalog.end()) continue;
         const SensorDescriptor &desc = descIt.value();
@@ -10427,7 +10459,7 @@ int main(int argc, char *argv[]) {
     auto walk = [&](std::vector<QCheckBox *> &checks, std::vector<int> &counts) {
       for (size_t i = 0; i < checks.size(); ++i) {
         if (!checks[i]) continue;
-        cb(checks[i]->text(), checks[i]->isChecked(), counts[i]);
+        cb(checks[i]->property("sensor_name").toString(), checks[i]->isChecked(), counts[i]);
       }
     };
     walk(cameraChecks, cameraSensorCounts);
@@ -10509,7 +10541,8 @@ int main(int argc, char *argv[]) {
                         std::vector<QLabel *> &countLabels) {
       for (size_t i = 0; i < checks.size(); ++i) {
         if (!checks[i]) continue;
-        const QJsonObject e = byName.value(checks[i]->text());
+        const QString sensorName = checks[i]->property("sensor_name").toString();
+        const QJsonObject e = byName.value(sensorName);
         if (e.isEmpty()) continue;
         checks[i]->setChecked(e.value("enabled").toBool());
         counts[i] = e.value("count").toInt(0);
@@ -10524,7 +10557,7 @@ int main(int argc, char *argv[]) {
           m.rx = mo.value("roll").toDouble();
           m.ry = mo.value("pitch").toDouble();
           m.rz = mo.value("yaw").toDouble();
-          sensor_mount_configs[checks[i]->text()] = m;
+          sensor_mount_configs[sensorName] = m;
         }
         const auto oo = e.value("optics").toObject();
         if (!oo.isEmpty()) {
@@ -10540,7 +10573,7 @@ int main(int argc, char *argv[]) {
           o.lensCircleFalloff = oo.value("lens_circle_falloff").toDouble(5.0);
           o.lensCircleMultiplier = oo.value("lens_circle_multiplier").toDouble(1.0);
           o.chromaticAberration = oo.value("chromatic_aberration_intensity").toDouble();
-          cameraOpticsByName[checks[i]->text()] = o;
+          cameraOpticsByName[sensorName] = o;
         }
       }
     };
@@ -11009,7 +11042,7 @@ int main(int argc, char *argv[]) {
 #endif
   });
 
-  QObject::connect(mapLoadBtn, &QPushButton::clicked, &window, [&, scenarioLogLine]() {
+  QObject::connect(mapLoadBtn, &QPushButton::clicked, &window, [&]() {
 #ifdef CARLA_STUDIO_WITH_LIBCARLA
     const QString m = mapCombo->currentText();
     if (m.isEmpty() || m.startsWith("(")) {
@@ -11027,7 +11060,7 @@ int main(int argc, char *argv[]) {
 #endif
   });
 
-  QObject::connect(mapReloadBtn, &QPushButton::clicked, &window, [&, scenarioLogLine]() {
+  QObject::connect(mapReloadBtn, &QPushButton::clicked, &window, [&]() {
 #ifdef CARLA_STUDIO_WITH_LIBCARLA
     auto c = scenarioConnectClient();
     if (!c) return;
@@ -11079,7 +11112,7 @@ int main(int argc, char *argv[]) {
     }
   });
 
-  QObject::connect(xodrImportBtn, &QPushButton::clicked, &window, [&, scenarioLogLine]() {
+  QObject::connect(xodrImportBtn, &QPushButton::clicked, &window, [&]() {
 #ifdef CARLA_STUDIO_WITH_LIBCARLA
     const QString path = xodrPath->text().trimmed();
     if (path.isEmpty()) { scenarioLogLine("✗ no XODR file selected"); return; }
@@ -11101,7 +11134,7 @@ int main(int argc, char *argv[]) {
 #endif
   });
 
-  QObject::connect(xodrExportBtn, &QPushButton::clicked, &window, [&, scenarioLogLine]() {
+  QObject::connect(xodrExportBtn, &QPushButton::clicked, &window, [&]() {
 #ifdef CARLA_STUDIO_WITH_LIBCARLA
     auto c = scenarioConnectClient();
     if (!c) return;

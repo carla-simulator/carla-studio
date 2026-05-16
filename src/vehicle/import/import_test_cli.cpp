@@ -378,7 +378,7 @@ float promptFloat(QTextStream &, const QString &label, float def,
   if (!isatty(fileno(stdin))) return def;
   const QString prompt = QString("  %1 [%2%3]: ")
                             .arg(label)
-                            .arg(QString::number(def, 'f', 2))
+                            .arg(QString::number(static_cast<double>(def), 'f', 2))
                             .arg(unit.isEmpty() ? QString() : QString(" %1").arg(unit));
   std::fputs(prompt.toLocal8Bit().constData(), stdout);
   std::fflush(stdout);
